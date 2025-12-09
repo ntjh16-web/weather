@@ -133,8 +133,8 @@
 
     <div class="footer-note">
         資料來源：中央氣象署 (API: F-D0047-xxx, 臺灣各縣市鄉鎮未來3天天氣預報)<br>
-        版本：2.0版<br>
-        製作人：Kusien
+        製作者：Kusien<br>
+        版本：2.5
     </div>
 
 <script>
@@ -172,15 +172,31 @@
     };
 
     // -------------------------------------------------------------
-    // 2. 核心：資料取得與解析
+    // 2. 核心：資料取得與解析 (新增記憶功能)
     // -------------------------------------------------------------
     window.onload = function() {
         initCityDropdowns();
-        // 預設選擇縣市並觸發地區載入
-        document.getElementById('cityA').value = '高雄市';
-        document.getElementById('cityB').value = '臺北市';
-        fetchDistricts('cityA', true);
-        fetchDistricts('cityB', true);
+        
+        // --- 載入記憶狀態 ---
+        const savedCityA = localStorage.getItem('weather_cityA') || '高雄市';
+        const savedDistrictAIndex = parseInt(localStorage.getItem('weather_districtA_idx'));
+        const savedCityB = localStorage.getItem('weather_cityB') || '臺北市';
+        const savedDistrictBIndex = parseInt(localStorage.getItem('weather_districtB_idx'));
+
+        // 設定縣市下拉選單的值
+        document.getElementById('cityA').value = savedCityA;
+        document.getElementById('cityB').value = savedCityB;
+        
+        // 載入地區資料 (使用異步處理確保兩邊都載入完成)
+        Promise.all([
+            fetchDistricts('cityA', true, savedDistrictAIndex),
+            fetchDistricts('cityB', true, savedDistrictBIndex)
+        ]).then(() => {
+            // 兩邊地區資料都載入後，才執行第一次比較
+            updateComparison();
+        }).catch(error => {
+            console.error("初始化載入失敗:", error);
+        });
     };
 
     // 初始化縣市下拉選單
@@ -205,7 +221,7 @@
     }
 
     // 根據選擇的縣市載入行政區資料
-    async function fetchDistricts(citySelectId, isInitialLoad = false) {
+    async function fetchDistricts(citySelectId, isInitialLoad = false, savedDistrictIndex = -1) {
         const citySelect = document.getElementById(citySelectId);
         const selectedCity = citySelect.value;
         const dataId = CITY_DATA_MAP[selectedCity];
@@ -215,7 +231,7 @@
 
         // 如果資料已存在，直接初始化地區選單
         if (allWeatherData[selectedCity]) {
-            initDistrictDropdowns(allWeatherData[selectedCity], districtSelect);
+            initDistrictDropdowns(allWeatherData[selectedCity], districtSelect, savedDistrictIndex);
             if (!isInitialLoad) updateComparison();
             return;
         }
@@ -223,7 +239,6 @@
         loading.style.display = 'block';
         districtSelect.innerHTML = '<option>載入中...</option>';
         
-        // 請求 API，不需要 locationName 參數，因為 API ID 已經鎖定縣市範圍
         const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/${dataId}?Authorization=${API_KEY}&format=JSON`;
 
         try {
@@ -252,7 +267,11 @@
                     const weatherData = targetCityData.location || targetCityData.Location;
                     allWeatherData[selectedCity] = weatherData; // 儲存資料
                     
-                    initDistrictDropdowns(weatherData, districtSelect);
+                    initDistrictDropdowns(weatherData, districtSelect, savedDistrictIndex);
+                    
+                    // 每次成功的縣市選擇都存起來
+                    localStorage.setItem(`weather_${citySelectId}`, selectedCity);
+                    
                     if (!isInitialLoad) updateComparison();
 
                 } else {
@@ -272,8 +291,10 @@
     }
 
     // 初始化地區下拉選單
-    function initDistrictDropdowns(weatherData, selectElement) {
+    function initDistrictDropdowns(weatherData, selectElement, savedDistrictIndex = -1) {
         selectElement.innerHTML = '';
+        
+        let targetIndex = 0; // 預設選第一個
         
         weatherData.forEach((loc, index) => {
             // 處理 LocationName/locationName 的差異
@@ -284,16 +305,21 @@
             option.text = districtName;
             
             selectElement.appendChild(option);
+            
+            // 如果有記憶的索引，且該索引在目前資料長度內，則設為目標索引
+            if (index === savedDistrictIndex) {
+                targetIndex = savedDistrictIndex;
+            }
         });
         
-        // 預設選取第一個選項
+        // 選取目標索引
         if(selectElement.options.length > 0) {
-             selectElement.selectedIndex = 0;
+             selectElement.selectedIndex = targetIndex;
         }
     }
 
     // -------------------------------------------------------------
-    // 3. 比較功能
+    // 3. 比較功能 (新增記憶儲存)
     // -------------------------------------------------------------
 
     // 更新比較區塊
@@ -314,7 +340,6 @@
             return;
         }
         
-        // 確保索引有效
         const locA = weatherDataA[idxA];
         const locB = weatherDataB[idxB];
 
@@ -322,6 +347,10 @@
             container.innerHTML = '<p style="text-align:center; color: red;">**錯誤：** 選擇的地區索引無效，請重新選擇。</p>';
             return;
         }
+
+        // --- 儲存記憶狀態 ---
+        localStorage.setItem('weather_districtA_idx', idxA);
+        localStorage.setItem('weather_districtB_idx', idxB);
 
         // 建立卡片
         container.appendChild(createWeatherCard(locA, cityA, 'scrollA'));
@@ -340,7 +369,7 @@
         }, 0); 
     }
 
-    // 根據 Location 資料建立單一地區天氣卡片 (修正後的邏輯)
+    // 根據 Location 資料建立單一地區天氣卡片
     function createWeatherCard(locationData, cityName, scrollId) {
         // 處理 LocationName 的大小寫問題
         const districtName = locationData.LocationName || locationData.locationName;
@@ -508,4 +537,3 @@
 
 </body>
 </html>
-
