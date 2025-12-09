@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高雄市行政區天氣比較看板 (3 天預報)</title>
+    <title>高雄市行政區天氣比較看板 (3 天預報 - 錯誤修正版)</title>
     <style>
         /* ------------------------------------------------------------- */
         /* 樣式表 (CSS) */
         /* ------------------------------------------------------------- */
         :root {
-            --primary-color: #007bb5; /* 藍色，更符合高雄市的港都意象 */
-            --accent-color: #f39c12; /* 橘色 */
+            --primary-color: #007bb5; 
+            --accent-color: #f39c12; 
             --bg-color: #f4f7f6;
             --header-bg: #eef2f3;
             --border-color: #ddd;
@@ -122,7 +122,7 @@
     // 1. API 配置與變數初始化 (已切換至 F-D0047-065 + 高雄市篩選)
     // -------------------------------------------------------------
     const API_KEY = 'CWA-E4AFF7A9-E0BD-4CB3-9447-963CE73C710C'; 
-    const DATA_ID = 'F-D0047-065'; // 實際上是 3 天預報的 ID
+    const DATA_ID = 'F-D0047-065'; 
     
     let weatherData = []; 
     const TARGET_CITY = '高雄市'; 
@@ -152,13 +152,14 @@
                     throw new Error("API 回傳的資料結構缺少 'records' 欄位。");
                 }
 
-                // 步驟 1: 嘗試處理 locations 的大小寫
+                // 步驟 1: 處理 locations 的大小寫
                 let locationsArray = data.records.locations || data.records.Locations; 
                 let targetCityData = null;
                 
                 // 步驟 2: 尋找目標城市資料 (高雄市)
                 if (locationsArray && locationsArray.length > 0) {
                     targetCityData = locationsArray.find(
+                        // 這裡也處理 LocationsName/locationsName 的差異
                         loc => loc.LocationsName === TARGET_CITY || loc.locationsName === TARGET_CITY
                     );
                 }
@@ -169,12 +170,10 @@
                     weatherData = targetCityData.location || targetCityData.Location; 
                     
                 } else {
-                    // 如果找不到，則可能 Key 權限又失效了，或者資料結構又變了
-                    throw new Error(`無法從 API 取得 ${TARGET_CITY} 鄉鎮地區資料。`);
+                    throw new Error(`無法從 API 取得 ${TARGET_CITY} 鄉鎮地區資料。請檢查 API URL 或 Key 權限。`);
                 }
                 
                 if (!weatherData || weatherData.length === 0) {
-                     // 如果找到城市區塊但鄉鎮陣列為空
                      throw new Error(`API 回傳的 ${TARGET_CITY} 鄉鎮地區陣列為空 (0筆資料)。`);
                 }
                 
@@ -196,7 +195,7 @@
     };
 
     // -------------------------------------------------------------
-    // 3. 介面操作函式 (與之前版本相同)
+    // 3. 介面操作函式
     // -------------------------------------------------------------
     
     // 初始化下拉選單
@@ -208,9 +207,12 @@
         selB.innerHTML = '';
 
         weatherData.forEach((loc, index) => {
+            // FIX: 處理 LocationName/locationName 的差異，確保下拉選單有文字
+            const districtName = loc.LocationName || loc.locationName;
+            
             const optionA = document.createElement('option');
             optionA.value = index;
-            optionA.text = loc.locationName;
+            optionA.text = districtName;
             
             const optionB = optionA.cloneNode(true);
             
@@ -262,34 +264,46 @@
                 scrollA.onscroll = function() { scrollB.scrollLeft = scrollA.scrollLeft; };
                 scrollB.onscroll = function() { scrollA.scrollLeft = scrollB.scrollLeft; };
             }
-        }, 0); // 延遲執行確保 DOM 渲染完成
+        }, 0); 
     }
 
     // 根據 Location 資料建立單一地區天氣卡片
     function createWeatherCard(locationData, scrollId) {
+        // FIX: 處理 LocationName 的大小寫問題
+        const districtName = locationData.LocationName || locationData.locationName;
+        
         const card = document.createElement('div');
         card.className = 'district-card';
 
         const title = document.createElement('div');
         title.className = 'district-header';
-        title.innerText = locationData.locationName + ' (' + TARGET_CITY + ')';
+        title.innerText = districtName + ' (' + TARGET_CITY + ')';
         card.appendChild(title);
 
         const scrollWrapper = document.createElement('div');
         scrollWrapper.className = 'table-scroll-wrapper';
         scrollWrapper.id = scrollId;
 
+        // FIX: 處理 WeatherElement/weatherElement 的差異，並檢查是否存在
+        const weatherElements = locationData.WeatherElement || locationData.weatherElement;
+        
+        if (!weatherElements) {
+             console.error("Missing weatherElement data for:", districtName);
+             card.innerHTML += `<p style="padding:15px; color:red;">${districtName} 缺少天氣元素資料。</p>`;
+             return card;
+        }
+
         // 將所有的 WeatherElement 轉換成以 ElementName 為 key 的 map 方便取用
-        const elements = locationData.weatherElement.reduce((acc, curr) => {
+        const elements = weatherElements.reduce((acc, curr) => {
             acc[curr.elementName] = curr.time;
             return acc;
         }, {});
 
-        // 使用 '溫度' 作為所有時間點的基準 (因為 3 天預報是逐小時的，不再使用 '平均溫度')
+        // 使用 '溫度' 作為所有時間點的基準
         const timePoints = elements['溫度']; 
         
         if (!timePoints) {
-            card.innerHTML += `<p style="padding:15px;">${locationData.locationName} 暫無詳細預報資料。</p>`;
+            card.innerHTML += `<p style="padding:15px;">${districtName} 暫無詳細預報資料 (缺少溫度資訊)。</p>`;
             return card; 
         }
 
@@ -298,15 +312,13 @@
         // 1. 日期列
         html += '<tr class="row-date"><th class="sticky-col">日期</th>';
         let dayHeaders = [];
-        // 用來追蹤每個獨立日期的 timePoints 數量
         let dateMap = new Map(); 
 
         timePoints.forEach((tp) => {
-            const dateStr = tp.DataTime.substring(5, 10).replace('-', '/'); // 這裡使用 DataTime
+            const dateStr = tp.DataTime.substring(5, 10).replace('-', '/'); 
             dateMap.set(dateStr, (dateMap.get(dateStr) || 0) + 1);
         });
 
-        // 生成帶有 colspan 的日期標題
         dateMap.forEach((span, dateStr) => {
             html += `<th colspan="${span}">${dateStr}</th>`;
         });
@@ -315,7 +327,7 @@
         // 2. 時間列
         html += '<tr class="row-time"><th class="sticky-col">時段</th>';
         timePoints.forEach(tp => {
-            const timeStr = tp.DataTime.substring(11, 16).replace(':00', ''); // 這裡使用 DataTime
+            const timeStr = tp.DataTime.substring(11, 16).replace(':00', ''); 
             html += `<td>${timeStr}</td>`;
         });
         html += '</tr>';
@@ -353,9 +365,10 @@
         let popIndex = 0;
         let popHtml = '';
         
-        // 由於 3 小時降雨機率的時間點較少，需要手動補齊或跳過
+        // 此段邏輯專門處理 3 小時預報間隔與逐小時溫度資料點的不一致性
         timePoints.forEach((tp) => {
             let val = '-';
+            
             // 檢查當前的預報時間點是否在降雨機率的時間區間內
             if (popIndex < pop3Data.length) {
                 const startTime = new Date(pop3Data[popIndex].StartTime);
@@ -366,24 +379,18 @@
                 if (dataTime >= startTime && dataTime < endTime) {
                     val = pop3Data[popIndex].ElementValue[0].ProbabilityOfPrecipitation;
                 }
-
-                // 如果當前 DataTime 已經超過 EndTime，則移動到下一個 Pop 區間
-                if (dataTime >= endTime) {
-                    // 如果下一個 Pop 區間存在，則檢查新的區間
-                    if (popIndex + 1 < pop3Data.length) {
-                        const nextStartTime = new Date(pop3Data[popIndex + 1].StartTime);
-                        const nextEndTime = new Date(pop3Data[popIndex + 1].EndTime);
-                        
-                        if (dataTime >= nextStartTime && dataTime < nextEndTime) {
-                            popIndex++;
+                
+                // 如果 DataTime 已經達到或超過下一個 Pop 區間的開始時間，則移動 Pop 指標
+                if (popIndex + 1 < pop3Data.length) {
+                    const nextStartTime = new Date(pop3Data[popIndex + 1].StartTime);
+                    if (dataTime >= nextStartTime) {
+                        popIndex++;
+                        // 檢查新的 Pop 區間
+                        const newStartTime = new Date(pop3Data[popIndex].StartTime);
+                        const newEndTime = new Date(pop3Data[popIndex].EndTime);
+                        if (dataTime >= newStartTime && dataTime < newEndTime) {
                             val = pop3Data[popIndex].ElementValue[0].ProbabilityOfPrecipitation;
-                        } else if (dataTime < nextStartTime) {
-                            // 預報時間點介於兩個 POP 區間之間（不應該發生，但作為魯棒性處理）
-                            val = '-';
                         }
-                    } else {
-                        // 沒有更多的 POP 區間了
-                        val = '-';
                     }
                 }
             }
