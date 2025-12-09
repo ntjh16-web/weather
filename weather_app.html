@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高雄市行政區天氣比較看板 (3 天預報)</title>
+    <title>高雄市行政區天氣比較看板 (3 天預報 - 最終修正版)</title>
     <style>
         /* ------------------------------------------------------------- */
         /* 樣式表 (CSS) */
@@ -133,7 +133,6 @@
         const loading = document.getElementById('loading');
         loading.style.display = 'block';
         
-        // 關鍵：加入 locationName=高雄市 (URL-encoded: %E9%AB%98%E9%9B%84%E5%B8%82)
         const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/${DATA_ID}?Authorization=${API_KEY}&format=JSON&locationName=%E9%AB%98%E9%9B%84%E5%B8%82`;
 
         try {
@@ -151,25 +150,23 @@
                     throw new Error("API 回傳的資料結構缺少 'records' 欄位。");
                 }
 
-                // 步驟 1: 處理 locations 的大小寫
+                // 處理 locations 的大小寫
                 let locationsArray = data.records.locations || data.records.Locations; 
                 let targetCityData = null;
                 
-                // 步驟 2: 尋找目標城市資料 (高雄市)
+                // 尋找目標城市資料 (高雄市)
                 if (locationsArray && locationsArray.length > 0) {
                     targetCityData = locationsArray.find(
-                        // 這裡也處理 LocationsName/locationsName 的差異
                         loc => loc.LocationsName === TARGET_CITY || loc.locationsName === TARGET_CITY
                     );
                 }
 
-                // 步驟 3: 確認是否找到目標城市資料，並從中取出鄉鎮資料 (location 陣列)
+                // 確認是否找到目標城市資料，並從中取出鄉鎮資料
                 if (targetCityData && (targetCityData.location || targetCityData.Location)) {
-                    // 找到了高雄市的鄉鎮資料
                     weatherData = targetCityData.location || targetCityData.Location; 
                     
                 } else {
-                    throw new Error(`無法從 API 取得 ${TARGET_CITY} 鄉鎮地區資料。請檢查 API URL 或 Key 權限。`);
+                    throw new Error(`無法從 API 取得 ${TARGET_CITY} 鄉鎮地區資料。`);
                 }
                 
                 if (!weatherData || weatherData.length === 0) {
@@ -268,7 +265,7 @@
 
     // 根據 Location 資料建立單一地區天氣卡片
     function createWeatherCard(locationData, scrollId) {
-        // FIX: 處理 LocationName 的大小寫問題
+        // 處理 LocationName 的大小寫問題
         const districtName = locationData.LocationName || locationData.locationName;
         
         const card = document.createElement('div');
@@ -283,29 +280,30 @@
         scrollWrapper.className = 'table-scroll-wrapper';
         scrollWrapper.id = scrollId;
 
-        // FIX: 處理 WeatherElement/weatherElement 的差異，並檢查是否存在
+        // 處理 WeatherElement/weatherElement 的差異，並檢查是否存在
         const weatherElements = locationData.WeatherElement || locationData.weatherElement;
         
         if (!weatherElements || weatherElements.length === 0) {
              console.error("Missing weatherElement data for:", districtName);
-             card.innerHTML += `<p style="padding:15px; color:red;">${districtName} 缺少天氣元素資料（可能是 API 資料源暫時性故障）。</p>`;
+             card.innerHTML += `<p style="padding:15px; color:red;">${districtName} 缺少天氣元素資料。</p>`;
              return card;
         }
 
-        // 將所有的 WeatherElement 轉換成以 ElementName 為 key 的 map 方便取用
+        // *** FIX HERE ***: 將所有的 WeatherElement 轉換成以 ElementName 為 key 的 map 方便取用
+        // 將 curr.elementName 修正為 curr.ElementName，將 curr.time 修正為 curr.Time
         const elements = weatherElements.reduce((acc, curr) => {
-            acc[curr.elementName] = curr.time;
+            acc[curr.ElementName] = curr.Time; // <--- 關鍵修正！
             return acc;
         }, {});
 
-        // *** 偵錯點 ***：檢查 API 回傳的欄位名稱是什麼
+        
         const timePoints = elements['溫度']; 
         
         if (!timePoints) {
-            // 列出所有可用的欄位名稱，以便我們調整程式碼
+            // 偵錯點：如果找不到溫度，列出所有可用的欄位
             const availableElements = Object.keys(elements).join(', ');
             const errorMsg = `暫無詳細預報資料，**無法找到「溫度」欄位**。<br>
-                              該區塊目前可用的欄位有：**${availableElements}**`;
+                              該區塊目前可用的欄位有：**${availableElements || '無可用欄位'}**`;
                               
             card.innerHTML += `<p style="padding:15px; color:red;">${errorMsg}</p>`;
             return card; 
@@ -318,6 +316,7 @@
         let dateMap = new Map(); 
 
         timePoints.forEach((tp) => {
+            // DataTime 屬於 Time 陣列下的物件
             const dateStr = tp.DataTime.substring(5, 10).replace('-', '/'); 
             dateMap.set(dateStr, (dateMap.get(dateStr) || 0) + 1);
         });
@@ -338,6 +337,7 @@
         // 3. 溫度 (逐時溫度)
         html += '<tr class="row-temp"><th class="sticky-col">溫度 (°C)</th>';
         timePoints.forEach((tp) => {
+            // ElementValue 屬於 Time 陣列下的物件
             const temp = tp.ElementValue[0].Temperature || '?';
             html += `<td>${temp}</td>`;
         });
@@ -353,7 +353,6 @@
                 html += `<td>${appT}</td>`;
             });
         } else {
-             // 如果體感溫度不見了，補齊欄位
             timePoints.forEach(() => { html += `<td>?</td>`; });
         }
         html += '</tr>';
@@ -366,7 +365,6 @@
                 html += `<td>${tp.ElementValue[0].RelativeHumidity}%</td>`;
             });
         } else {
-             // 如果相對濕度不見了，補齊欄位
             timePoints.forEach(() => { html += `<td>?</td>`; });
         }
         html += '</tr>';
@@ -380,7 +378,7 @@
             let popIndex = 0;
             let popHtml = '';
             
-            // 此段邏輯專門處理 3 小時預報間隔與逐小時溫度資料點的不一致性
+            // 處理 3 小時預報間隔與逐小時溫度資料點的不一致性
             timePoints.forEach((tp) => {
                 let val = '-';
                 
@@ -411,7 +409,6 @@
             });
             html += popHtml;
         } else {
-             // 如果降雨機率不見了，補齊欄位
             timePoints.forEach(() => { html += `<td>?</td>`; });
         }
         html += '</tr>';
@@ -425,7 +422,6 @@
                 html += `<td title="${wxText}" style="font-size:12px;">${wxText}</td>`;
             });
         } else {
-             // 如果天氣現象不見了，補齊欄位
             timePoints.forEach(() => { html += `<td>?</td>`; });
         }
         html += '</tr>';
