@@ -185,19 +185,19 @@
         </div>
 
     <div class="footer-note">
-        資料來源：中央氣象署 (API: F-D0047-073)<br>
+        資料來源：中央氣象署 (API: F-D0047-075)<br>
         授權碼：CWA-E4AFF7A9-E0BD-4CB3-9447-963CE73C710C
     </div>
 
 <script>
     // 確認 API Key 與最新的資料集 ID
     const API_KEY = 'CWA-E4AFF7A9-E0BD-4CB3-9447-963CE73C710C';
-    const KAOHSIUNG_ID = 'F-D0047-073'; 
+    const KAOHSIUNG_ID = 'F-D0047-075'; // 使用 F-D0047-075
     
     let weatherData = []; 
     let districts = [];
 
-    // 初始化：直接呼叫 CWA API (不使用代理服務)
+    // 初始化：直接呼叫 CWA API 
     window.onload = async function() {
         const loading = document.getElementById('loading');
         loading.style.display = 'block';
@@ -215,14 +215,15 @@
             const data = await response.json();
             
             if (data.success === "true") {
-                // *** 修正資料解析路徑：嘗試直接讀取 location 陣列，以適應 F-D0047-073 結構 ***
-                if (data.records && data.records.location) {
-                    weatherData = data.records.location;
-                } else if (data.records && data.records.locations && data.records.locations[0] && data.records.locations[0].location) {
-                    // 保留舊的巢狀結構讀取方式，作為備用
+                // *** 修正資料解析路徑：F-D0047-075 的資料通常位於 data.records.locations[0].location ***
+                if (data.records && data.records.locations && data.records.locations[0] && data.records.locations[0].location) {
                     weatherData = data.records.locations[0].location;
+                } else if (data.records && data.records.location) {
+                    // 備用路徑 
+                    weatherData = data.records.location;
                 } else {
-                    throw new Error("無法解析 API 資料結構 (records.location 不存在)");
+                    // 如果還是失敗，拋出錯誤
+                    throw new Error("無法解析 API 資料結構，請檢查資料集 ID。");
                 }
                 
                 if (weatherData.length === 0) {
