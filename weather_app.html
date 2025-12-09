@@ -185,7 +185,7 @@
         </div>
 
     <div class="footer-note">
-        資料來源：中央氣象署 (API: F-D0047-071)<br>
+        資料來源：中央氣象署 (API: F-D0047-071, 限定高雄市)<br>
         授權碼：CWA-E4AFF7A9-E0BD-4CB3-9447-963CE73C710C
     </div>
 
@@ -202,40 +202,40 @@
         const loading = document.getElementById('loading');
         loading.style.display = 'block';
 
-        // 直接構造 CWA API 網址
-        const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/${KAOHSIUNG_ID}?Authorization=${API_KEY}&format=JSON`;
+        // *** 關鍵修正：在 URL 中明確指定 locationName=高雄市 ***
+        const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/${KAOHSIUNG_ID}?Authorization=${API_KEY}&format=JSON&locationName=高雄市`;
 
         try {
             const response = await fetch(apiUrl);
             
             if (!response.ok) {
-                // 如果 API Key 錯誤，這裡通常會回傳 401/403
                 throw new Error(`API response status: ${response.status}`);
             }
 
             const data = await response.json();
             
             if (data.success === "true") {
-                // *** 處理 F-D0047-071 資料結構：data.records.locations 是一個縣市陣列，高雄是其中一個 ***
+                // 由於我們請求了 locationName=高雄市，所以 locations 陣列中應該只有一個縣市的資料
                 if (data.records && data.records.locations && data.records.locations.length > 0) {
-                    const kaohsiungData = data.records.locations.find(loc => loc.locationName === '高雄市');
+                    
+                    const kaohsiungData = data.records.locations[0];
                     
                     if (kaohsiungData && kaohsiungData.location) {
-                        weatherData = kaohsiungData.location;
+                        weatherData = kaohsiungData.location; // 鄉鎮資料陣列
                     } else {
-                        throw new Error("API 資料結構正確，但找不到高雄市的資料。");
+                        // 如果請求成功但找不到 location，這可能是結構問題
+                        throw new Error("API 請求成功，但無法找到鄉鎮地區資料。");
                     }
                     
                 } else if (data.records && data.records.location) {
-                    // 舊資料集或特殊情況的備用路徑 
+                    // 備用路徑 (適用於某些舊的資料集結構)
                     weatherData = data.records.location;
                 } else {
-                    // 如果還是失敗，拋出錯誤
                     throw new Error("無法解析 API 資料結構，請檢查資料集 ID 或授權碼。");
                 }
                 
                 if (weatherData.length === 0) {
-                     throw new Error("API 回傳的 location 陣列為空。");
+                     throw new Error("API 回傳的鄉鎮地區陣列為空。");
                 }
                 
                 initDropdowns();
@@ -299,6 +299,7 @@
         const scrollB = document.getElementById('scrollB');
 
         if(scrollA && scrollB) {
+            // 同步捲動兩個表格
             scrollA.addEventListener('scroll', function() {
                 scrollB.scrollLeft = scrollA.scrollLeft;
             });
@@ -321,13 +322,20 @@
         scrollWrapper.className = 'table-scroll-wrapper';
         scrollWrapper.id = scrollId;
 
-        // T: 溫度, AT: 體感, RH: 濕度, PoP12h: 降雨機率(12h), Wx: 天氣現象
+        // 將所有的 WeatherElement 轉換成以 ElementName 為 key 的 map 方便取用
         const elements = locationData.weatherElement.reduce((acc, curr) => {
             acc[curr.elementName] = curr.time;
             return acc;
         }, {});
 
-        const timePoints = elements['T']; 
+        // 以平均溫度 (T) 作為時間點的基準
+        // T: 平均溫度 (F-D0047-071 資料集使用 T 來表示平均溫度)
+        const timePoints = elements['平均溫度']; 
+        
+        if (!timePoints) {
+            return card; // 如果沒有時間點，直接返回空卡片
+        }
+
 
         let html = '<table>';
         
@@ -340,8 +348,8 @@
         timePoints.forEach((tp, index) => {
             const dateStr = tp.startTime.substring(5, 10).replace('-', '/'); 
             const dateObj = new Date(tp.startTime);
-            const dayOfWeek = ["日", "一", "二", "三", "四", "五", "六"][dateObj.getDay()];
-            const fullDate = `${dateStr} (${dayOfWeek})`;
+            // 由於 JavaScript 的 Date 處理時區可能導致日期計算錯誤，這裡簡化為只顯示日期
+            const fullDate = `${dateStr}`; 
 
             if (fullDate !== currentDay) {
                 if (currentDay !== '') {
@@ -363,51 +371,64 @@
         html += '</tr>';
 
         // 2. 時間列
-        html += '<tr class="row-time"><th class="sticky-col">時間</th>';
+        html += '<tr class="row-time"><th class="sticky-col">時段</th>';
         timePoints.forEach(tp => {
             const timeStr = tp.startTime.substring(11, 16); 
-            html += `<td>${timeStr}</td>`;
+            // 顯示時段，如 06:00-18:00 或 18:00-06:00
+            const endTimeStr = tp.endTime.substring(11, 16);
+            html += `<td>${timeStr.replace(':00', '')}-${endTimeStr.replace(':00', '')}</td>`;
         });
         html += '</tr>';
 
-        // 3. 溫度
+        // 3. 溫度 (取最高和最低溫)
+        // 由於 F-D0047-071 的 T 是平均溫度，我們使用 MinT 和 MaxT 來顯示範圍
+        const minTemps = elements['最低溫度'];
+        const maxTemps = elements['最高溫度'];
+
         html += '<tr class="row-temp"><th class="sticky-col">溫度 (°C)</th>';
-        timePoints.forEach(tp => {
-            html += `<td>${tp.elementValue[0].value}</td>`;
+        timePoints.forEach((tp, index) => {
+            const minT = minTemps[index] ? minTemps[index].ElementValue[0].MinTemperature : '?';
+            const maxT = maxTemps[index] ? maxTemps[index].ElementValue[0].MaxTemperature : '?';
+            html += `<td>${minT}~${maxT}</td>`;
         });
         html += '</tr>';
 
-        // 4. 體感溫度 (AT)
+        // 4. 體感溫度 (MaxAT 和 MinAT)
+        const minAppTemps = elements['最低體感溫度'];
+        const maxAppTemps = elements['最高體感溫度'];
+        
         html += '<tr class="row-app-temp"><th class="sticky-col">體感 (°C)</th>';
-        elements['AT'].forEach(tp => {
-            html += `<td>${tp.elementValue[0].value}</td>`;
+        timePoints.forEach((tp, index) => {
+            const minAT = minAppTemps[index] ? minAppTemps[index].ElementValue[0].MinApparentTemperature : '?';
+            const maxAT = maxAppTemps[index] ? maxAppTemps[index].ElementValue[0].MaxApparentTemperature : '?';
+            html += `<td>${minAT}~${maxAT}</td>`;
         });
         html += '</tr>';
 
-        // 5. 相對濕度 (RH)
+
+        // 5. 相對濕度 (平均相對濕度)
+        const rhData = elements['平均相對濕度'];
         html += '<tr class="row-rh"><th class="sticky-col">濕度 (%)</th>';
-        elements['RH'].forEach(tp => {
-            html += `<td>${tp.elementValue[0].value}%</td>`;
+        rhData.forEach(tp => {
+            html += `<td>${tp.ElementValue[0].RelativeHumidity}%</td>`;
         });
         html += '</tr>';
 
-        // 6. 降雨機率 (PoP12h)
+        // 6. 降雨機率 (12小時降雨機率)
+        const popData = elements['12小時降雨機率'];
         html += '<tr class="row-pop"><th class="sticky-col">降雨機率</th>';
-        const popData = elements['PoP12h'];
-        timePoints.forEach(tp => {
-            const match = popData.find(p => {
-                return (p.startTime <= tp.startTime && tp.startTime < p.endTime);
-            });
-            let val = match ? match.elementValue[0].value : ' ';
-            if (val !== ' ') val += '%';
+        popData.forEach(tp => {
+            let val = tp.ElementValue[0].ProbabilityOfPrecipitation;
+            if (val !== '-') val += '%';
             html += `<td>${val}</td>`;
         });
         html += '</tr>';
 
-        // 7. 天氣狀況 (Wx)
+        // 7. 天氣狀況 (天氣現象)
+        const wxData = elements['天氣現象'];
         html += '<tr class="row-wx"><th class="sticky-col">天氣</th>';
-        elements['Wx'].forEach(tp => {
-            const wxText = tp.elementValue[0].value;
+        wxData.forEach(tp => {
+            const wxText = tp.ElementValue[0].Weather;
             html += `<td title="${wxText}" style="font-size:12px;">${wxText}</td>`;
         });
         html += '</tr>';
