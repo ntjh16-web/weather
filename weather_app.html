@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高雄市行政區天氣比較看板 (F-D0047-065)</title>
+    <title>高雄市行政區天氣比較看板 (3 天預報)</title>
     <style>
         /* ------------------------------------------------------------- */
         /* 樣式表 (CSS) */
         /* ------------------------------------------------------------- */
         :root {
-            --primary-color: #2c3e50;
-            --accent-color: #3498db;
+            --primary-color: #007bb5; /* 藍色，更符合高雄市的港都意象 */
+            --accent-color: #f39c12; /* 橘色 */
             --bg-color: #f4f7f6;
             --header-bg: #eef2f3;
             --border-color: #ddd;
@@ -92,7 +92,7 @@
 </head>
 <body>
 
-    <h2>臺北市行政區天氣比較看板 (F-D0047-065)</h2>
+    <h2>高雄市行政區天氣比較看板 (3 天預報)</h2>
 
     <div class="controls">
         <div class="control-group">
@@ -112,32 +112,30 @@
         </div>
 
     <div class="footer-note">
-        資料來源：中央氣象署 (API: F-D0047-065, 臺北市專屬)<br>
-        **注意：本介面顯示臺北市資料，因為您的公開 Key 權限無法穩定取得高雄市資料。**<br>
+        資料來源：中央氣象署 (API: F-D0047-065, 臺灣各縣市鄉鎮未來3天天氣預報)<br>
+        **注意：此資料集雖然 ID 與文件不符，但可成功回傳高雄市 3 天預報資料。**<br>
         授權碼：CWA-E4AFF7A9-E0BD-4CB3-9447-963CE73C710C
     </div>
 
 <script>
     // -------------------------------------------------------------
-    // 1. API 配置與變數初始化 (已切換至 F-D0047-065, 臺北市)
+    // 1. API 配置與變數初始化 (已切換至 F-D0047-065 + 高雄市篩選)
     // -------------------------------------------------------------
     const API_KEY = 'CWA-E4AFF7A9-E0BD-4CB3-9447-963CE73C710C'; 
-    // F-D0047-065: 臺北市未來 1 週逐 12 小時天氣預報
-    const DATA_ID = 'F-D0047-065'; 
+    const DATA_ID = 'F-D0047-065'; // 實際上是 3 天預報的 ID
     
     let weatherData = []; 
-    // 目標城市名稱已更改
-    const TARGET_CITY = '臺北市'; 
+    const TARGET_CITY = '高雄市'; 
 
     // -------------------------------------------------------------
-    // 2. 核心：資料取得與解析 (魯棒版本，針對 F-D0047-065 臺北市)
+    // 2. 核心：資料取得與解析 
     // -------------------------------------------------------------
     window.onload = async function() {
         const loading = document.getElementById('loading');
         loading.style.display = 'block';
-
-        // URL 不需篩選 locationName，因為 ID F-D0047-065 已經是臺北市專屬
-        const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/${DATA_ID}?Authorization=${API_KEY}&format=JSON`;
+        
+        // 關鍵：加入 locationName=高雄市 (URL-encoded: %E9%AB%98%E9%9B%84%E5%B8%82)
+        const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/${DATA_ID}?Authorization=${API_KEY}&format=JSON&locationName=%E9%AB%98%E9%9B%84%E5%B8%82`;
 
         try {
             const response = await fetch(apiUrl);
@@ -154,28 +152,25 @@
                     throw new Error("API 回傳的資料結構缺少 'records' 欄位。");
                 }
 
-                // 嘗試處理 locations 的大小寫
+                // 步驟 1: 嘗試處理 locations 的大小寫
                 let locationsArray = data.records.locations || data.records.Locations; 
                 let targetCityData = null;
                 
-                // 步驟 1: 嘗試從 locations 陣列中尋找 '臺北市'
+                // 步驟 2: 尋找目標城市資料 (高雄市)
                 if (locationsArray && locationsArray.length > 0) {
-                    // 嘗試處理 LocationsName 的大小寫
                     targetCityData = locationsArray.find(
                         loc => loc.LocationsName === TARGET_CITY || loc.locationsName === TARGET_CITY
                     );
                 }
 
-                // 步驟 2: 確認是否找到目標城市資料，並從中取出鄉鎮資料 (location 陣列)
+                // 步驟 3: 確認是否找到目標城市資料，並從中取出鄉鎮資料 (location 陣列)
                 if (targetCityData && (targetCityData.location || targetCityData.Location)) {
+                    // 找到了高雄市的鄉鎮資料
                     weatherData = targetCityData.location || targetCityData.Location; 
                     
-                } else if (data.records.location || data.records.Location) {
-                    // 步驟 3: 備用路徑 - 如果 API 直接返回鄉鎮資料陣列在 records 層級
-                    weatherData = data.records.location || data.records.Location; 
                 } else {
-                    // 如果所有路徑都失敗，則拋出詳細錯誤
-                    throw new Error(`無法從 API 取得 ${TARGET_CITY} 鄉鎮地區資料。JSON結構不符。`);
+                    // 如果找不到，則可能 Key 權限又失效了，或者資料結構又變了
+                    throw new Error(`無法從 API 取得 ${TARGET_CITY} 鄉鎮地區資料。`);
                 }
                 
                 if (!weatherData || weatherData.length === 0) {
@@ -185,8 +180,8 @@
                 
                 // 資料成功取得後，初始化介面
                 initDropdowns();
-                // 預設選擇臺北市的兩個區
-                selectDefault('信義區', '士林區'); 
+                // 預設選擇高雄市的兩個區
+                selectDefault('鹽埕區', '鼓山區'); 
                 updateComparison();
                 
             } else {
@@ -201,7 +196,7 @@
     };
 
     // -------------------------------------------------------------
-    // 3. 介面操作函式
+    // 3. 介面操作函式 (與之前版本相同)
     // -------------------------------------------------------------
     
     // 初始化下拉選單
@@ -290,8 +285,8 @@
             return acc;
         }, {});
 
-        // 使用 '平均溫度' 作為所有時間點的基準
-        const timePoints = elements['平均溫度']; 
+        // 使用 '溫度' 作為所有時間點的基準 (因為 3 天預報是逐小時的，不再使用 '平均溫度')
+        const timePoints = elements['溫度']; 
         
         if (!timePoints) {
             card.innerHTML += `<p style="padding:15px;">${locationData.locationName} 暫無詳細預報資料。</p>`;
@@ -307,7 +302,7 @@
         let dateMap = new Map(); 
 
         timePoints.forEach((tp) => {
-            const dateStr = tp.startTime.substring(5, 10).replace('-', '/'); 
+            const dateStr = tp.DataTime.substring(5, 10).replace('-', '/'); // 這裡使用 DataTime
             dateMap.set(dateStr, (dateMap.get(dateStr) || 0) + 1);
         });
 
@@ -320,60 +315,89 @@
         // 2. 時間列
         html += '<tr class="row-time"><th class="sticky-col">時段</th>';
         timePoints.forEach(tp => {
-            const timeStr = tp.startTime.substring(11, 16).replace(':00', ''); 
-            const endTimeStr = tp.endTime.substring(11, 16).replace(':00', '');
-            html += `<td>${timeStr}-${endTimeStr}</td>`;
+            const timeStr = tp.DataTime.substring(11, 16).replace(':00', ''); // 這裡使用 DataTime
+            html += `<td>${timeStr}</td>`;
         });
         html += '</tr>';
 
-        // 3. 溫度 (最高和最低溫)
-        const minTemps = elements['最低溫度'];
-        const maxTemps = elements['最高溫度'];
-
+        // 3. 溫度 (逐時溫度)
         html += '<tr class="row-temp"><th class="sticky-col">溫度 (°C)</th>';
-        timePoints.forEach((tp, index) => {
-            const minT = minTemps[index]?.ElementValue[0]?.MinTemperature || '?';
-            const maxT = maxTemps[index]?.ElementValue[0]?.MaxTemperature || '?';
-            html += `<td>${minT}~${maxT}</td>`;
+        timePoints.forEach((tp) => {
+            const temp = tp.ElementValue[0].Temperature || '?';
+            html += `<td>${temp}</td>`;
         });
         html += '</tr>';
 
-        // 4. 體感溫度 (MaxAT 和 MinAT)
-        const minAppTemps = elements['最低體感溫度'];
-        const maxAppTemps = elements['最高體感溫度'];
+        // 4. 體感溫度 (逐時體感溫度)
+        const appTemps = elements['體感溫度'];
         
         html += '<tr class="row-app-temp"><th class="sticky-col">體感 (°C)</th>';
-        timePoints.forEach((tp, index) => {
-            const minAT = minAppTemps[index]?.ElementValue[0]?.MinApparentTemperature || '?';
-            const maxAT = maxAppTemps[index]?.ElementValue[0]?.MaxApparentTemperature || '?';
-            html += `<td>${minAT}~${maxAT}</td>`;
+        appTemps.forEach((tp) => {
+            const appT = tp.ElementValue[0].ApparentTemperature || '?';
+            html += `<td>${appT}</td>`;
         });
         html += '</tr>';
 
-
-        // 5. 相對濕度 (平均相對濕度)
-        const rhData = elements['平均相對濕度'];
+        // 5. 相對濕度
+        const rhData = elements['相對濕度'];
         html += '<tr class="row-rh"><th class="sticky-col">濕度 (%)</th>';
         rhData.forEach(tp => {
             html += `<td>${tp.ElementValue[0].RelativeHumidity}%</td>`;
         });
         html += '</tr>';
 
-        // 6. 降雨機率 (12小時降雨機率)
-        const popData = elements['12小時降雨機率'];
+        // 6. 降雨機率 (此 3 天預報為 3 小時降雨機率，時間點較少)
+        const pop3Data = elements['3小時降雨機率'];
         html += '<tr class="row-pop"><th class="sticky-col">降雨機率</th>';
-        popData.forEach(tp => {
-            let val = tp.ElementValue[0].ProbabilityOfPrecipitation;
+        
+        let popIndex = 0;
+        let popHtml = '';
+        
+        // 由於 3 小時降雨機率的時間點較少，需要手動補齊或跳過
+        timePoints.forEach((tp) => {
+            let val = '-';
+            // 檢查當前的預報時間點是否在降雨機率的時間區間內
+            if (popIndex < pop3Data.length) {
+                const startTime = new Date(pop3Data[popIndex].StartTime);
+                const endTime = new Date(pop3Data[popIndex].EndTime);
+                const dataTime = new Date(tp.DataTime);
+                
+                // 檢查 DataTime 是否在 [StartTime, EndTime) 區間內
+                if (dataTime >= startTime && dataTime < endTime) {
+                    val = pop3Data[popIndex].ElementValue[0].ProbabilityOfPrecipitation;
+                }
+
+                // 如果當前 DataTime 已經超過 EndTime，則移動到下一個 Pop 區間
+                if (dataTime >= endTime) {
+                    // 如果下一個 Pop 區間存在，則檢查新的區間
+                    if (popIndex + 1 < pop3Data.length) {
+                        const nextStartTime = new Date(pop3Data[popIndex + 1].StartTime);
+                        const nextEndTime = new Date(pop3Data[popIndex + 1].EndTime);
+                        
+                        if (dataTime >= nextStartTime && dataTime < nextEndTime) {
+                            popIndex++;
+                            val = pop3Data[popIndex].ElementValue[0].ProbabilityOfPrecipitation;
+                        } else if (dataTime < nextStartTime) {
+                            // 預報時間點介於兩個 POP 區間之間（不應該發生，但作為魯棒性處理）
+                            val = '-';
+                        }
+                    } else {
+                        // 沒有更多的 POP 區間了
+                        val = '-';
+                    }
+                }
+            }
+            
             if (val !== '-') val += '%';
-            html += `<td>${val}</td>`;
+            popHtml += `<td>${val}</td>`;
         });
-        html += '</tr>';
+        html += popHtml + '</tr>';
 
         // 7. 天氣狀況 (天氣現象)
         const wxData = elements['天氣現象'];
         html += '<tr class="row-wx"><th class="sticky-col">天氣</th>';
         wxData.forEach(tp => {
-            const wxText = tp.ElementValue[0].Weather;
+            const wxText = tp.ElementValue[0].WeatherDescription; // 3 天預報使用 WeatherDescription
             html += `<td title="${wxText}" style="font-size:12px;">${wxText}</td>`;
         });
         html += '</tr>';
