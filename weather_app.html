@@ -185,14 +185,14 @@
         </div>
 
     <div class="footer-note">
-        資料來源：中央氣象署 (API: F-D0047-075)<br>
+        資料來源：中央氣象署 (API: F-D0047-071)<br>
         授權碼：CWA-E4AFF7A9-E0BD-4CB3-9447-963CE73C710C
     </div>
 
 <script>
     // 確認 API Key 與最新的資料集 ID
     const API_KEY = 'CWA-E4AFF7A9-E0BD-4CB3-9447-963CE73C710C';
-    const KAOHSIUNG_ID = 'F-D0047-075'; // 使用 F-D0047-075
+    const KAOHSIUNG_ID = 'F-D0047-071'; // 使用 F-D0047-071 (臺灣各縣市鄉鎮未來一週天氣預報)
     
     let weatherData = []; 
     let districts = [];
@@ -209,21 +209,29 @@
             const response = await fetch(apiUrl);
             
             if (!response.ok) {
+                // 如果 API Key 錯誤，這裡通常會回傳 401/403
                 throw new Error(`API response status: ${response.status}`);
             }
 
             const data = await response.json();
             
             if (data.success === "true") {
-                // *** 修正資料解析路徑：F-D0047-075 的資料通常位於 data.records.locations[0].location ***
-                if (data.records && data.records.locations && data.records.locations[0] && data.records.locations[0].location) {
-                    weatherData = data.records.locations[0].location;
+                // *** 處理 F-D0047-071 資料結構：data.records.locations 是一個縣市陣列，高雄是其中一個 ***
+                if (data.records && data.records.locations && data.records.locations.length > 0) {
+                    const kaohsiungData = data.records.locations.find(loc => loc.locationName === '高雄市');
+                    
+                    if (kaohsiungData && kaohsiungData.location) {
+                        weatherData = kaohsiungData.location;
+                    } else {
+                        throw new Error("API 資料結構正確，但找不到高雄市的資料。");
+                    }
+                    
                 } else if (data.records && data.records.location) {
-                    // 備用路徑 
+                    // 舊資料集或特殊情況的備用路徑 
                     weatherData = data.records.location;
                 } else {
                     // 如果還是失敗，拋出錯誤
-                    throw new Error("無法解析 API 資料結構，請檢查資料集 ID。");
+                    throw new Error("無法解析 API 資料結構，請檢查資料集 ID 或授權碼。");
                 }
                 
                 if (weatherData.length === 0) {
@@ -238,7 +246,7 @@
             }
         } catch (error) {
             console.error("連線或解析錯誤:", error);
-            alert(`連線或 API 錯誤：${error.message}。請確認 CWA 授權碼是否有效，且網路連線正常。`);
+            alert(`連線或 API 錯誤：${error.message}。如果持續失敗，請檢查 CWA 授權碼的有效性和權限。`);
         } finally {
             loading.style.display = 'none';
         }
