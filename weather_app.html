@@ -329,4 +329,91 @@
         
         timePoints.forEach((tp, index) => {
             const dateStr = tp.startTime.substring(5, 10).replace('-', '/'); // "12/09"
-            const dateObj
+            const dateObj = new Date(tp.startTime);
+            const dayOfWeek = ["日", "一", "二", "三", "四", "五", "六"][dateObj.getDay()];
+            const fullDate = `${dateStr} (${dayOfWeek})`;
+
+            if (fullDate !== currentDay) {
+                if (currentDay !== '') {
+                    dayHeaders.push({text: currentDay, span: spanCount});
+                }
+                currentDay = fullDate;
+                spanCount = 1;
+            } else {
+                spanCount++;
+            }
+            // 最後一個也要加入
+            if (index === timePoints.length - 1) {
+                 dayHeaders.push({text: currentDay, span: spanCount});
+            }
+        });
+
+        dayHeaders.forEach(h => {
+            html += `<th colspan="${h.span}">${h.text}</th>`;
+        });
+        html += '</tr>';
+
+        // 2. 時間列
+        html += '<tr class="row-time"><th class="sticky-col">時間</th>';
+        timePoints.forEach(tp => {
+            const timeStr = tp.startTime.substring(11, 16); // "09:00"
+            html += `<td>${timeStr}</td>`;
+        });
+        html += '</tr>';
+
+        // 3. 溫度
+        html += '<tr class="row-temp"><th class="sticky-col">溫度 (°C)</th>';
+        timePoints.forEach(tp => {
+            html += `<td>${tp.elementValue[0].value}</td>`;
+        });
+        html += '</tr>';
+
+        // 4. 體感溫度 (API: AT)
+        html += '<tr class="row-app-temp"><th class="sticky-col">體感 (°C)</th>';
+        elements['AT'].forEach(tp => {
+            html += `<td>${tp.elementValue[0].value}</td>`;
+        });
+        html += '</tr>';
+
+        // 5. 相對濕度 (API: RH)
+        html += '<tr class="row-rh"><th class="sticky-col">濕度 (%)</th>';
+        elements['RH'].forEach(tp => {
+            html += `<td>${tp.elementValue[0].value}%</td>`;
+        });
+        html += '</tr>';
+
+        // 6. 降雨機率 (API: PoP12h - 因為是長天期，通常是12h一筆，這裡需要特別處理對應)
+        // 注意：長天期預報 PoP12h 的時間區段較長，需要 mapping 到每 3 小時的格子
+        html += '<tr class="row-pop"><th class="sticky-col">降雨機率</th>';
+        const popData = elements['PoP12h'];
+        timePoints.forEach(tp => {
+            // 尋找涵蓋目前時間點的 PoP 資料
+            const match = popData.find(p => {
+                // 簡單判斷：PoP startTime <= tp startTime < PoP endTime
+                return (p.startTime <= tp.startTime && tp.startTime < p.endTime);
+            });
+            let val = match ? match.elementValue[0].value : ' ';
+            if (val !== ' ') val += '%';
+            html += `<td>${val}</td>`;
+        });
+        html += '</tr>';
+
+        // 7. 天氣狀況 (API: Wx)
+        html += '<tr class="row-wx"><th class="sticky-col">天氣</th>';
+        elements['Wx'].forEach(tp => {
+            // 這裡只顯示文字，如果字太長可以用 title
+            const wxText = tp.elementValue[0].value;
+            html += `<td title="${wxText}" style="font-size:12px;">${wxText}</td>`;
+        });
+        html += '</tr>';
+
+        html += '</table>';
+        scrollWrapper.innerHTML = html;
+        card.appendChild(scrollWrapper);
+
+        return card;
+    }
+</script>
+
+</body>
+</html>
