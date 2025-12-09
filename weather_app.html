@@ -84,8 +84,18 @@
         .sticky-col { 
             position: sticky; left: 0; background-color: var(--header-bg); z-index: 2; font-weight: bold; border-right: 2px solid #ccc; min-width: 80px; 
         }
+        /* 天氣數據顏色 */
         .row-temp td { color: #d35400; font-weight: bold; }
-        .footer-note { margin-top: 20px; text-align: right; font-size: 0.8em; color: #777; }
+        .pop-low { color: #2980b9; font-weight: bold; } /* 30-40% 藍色 */
+        .pop-high { color: #c0392b; font-weight: bold; } /* 50%+ 紅色 */
+        
+        .footer-note { 
+            margin-top: 20px; 
+            text-align: right; 
+            font-size: 0.8em; 
+            color: #777; 
+            line-height: 1.5;
+        }
         
         @media (max-width: 900px) { 
             .comparison-container { grid-template-columns: 1fr; } 
@@ -134,7 +144,7 @@
     <div class="footer-note">
         資料來源：中央氣象署 (API: F-D0047-xxx, 臺灣各縣市鄉鎮未來3天天氣預報)<br>
         製作者：Kusien<br>
-        版本：2.5
+        版本：2.6
     </div>
 
 <script>
@@ -142,10 +152,8 @@
     // 1. API 配置與變數初始化
     // -------------------------------------------------------------
     const API_KEY = 'CWA-E4AFF7A9-E0BD-4CB3-9447-963CE73C710C'; 
-    // 存放所有縣市的行政區資料 (Key: CityName, Value: [LocationData...])
     let allWeatherData = {}; 
     
-    // 縣市名稱與對應的 DATA_ID 映射表
     const CITY_DATA_MAP = {
         '宜蘭縣': 'F-D0047-001',
         '桃園市': 'F-D0047-005',
@@ -172,7 +180,7 @@
     };
 
     // -------------------------------------------------------------
-    // 2. 核心：資料取得與解析 (新增記憶功能)
+    // 2. 核心：資料取得與解析 (保留記憶功能)
     // -------------------------------------------------------------
     window.onload = function() {
         initCityDropdowns();
@@ -229,7 +237,6 @@
         const districtSelect = document.getElementById(districtSelectId);
         const loading = document.getElementById('loading');
 
-        // 如果資料已存在，直接初始化地區選單
         if (allWeatherData[selectedCity]) {
             initDistrictDropdowns(allWeatherData[selectedCity], districtSelect, savedDistrictIndex);
             if (!isInitialLoad) updateComparison();
@@ -255,21 +262,18 @@
                 let locationsArray = data.records.locations || data.records.Locations; 
                 let targetCityData = null;
                 
-                // 找到目標城市資料
                 if (locationsArray && locationsArray.length > 0) {
                     targetCityData = locationsArray.find(
                         loc => loc.LocationsName === selectedCity || loc.locationsName === selectedCity
                     );
                 }
                 
-                // 取出鄉鎮資料
                 if (targetCityData && (targetCityData.location || targetCityData.Location)) {
                     const weatherData = targetCityData.location || targetCityData.Location;
-                    allWeatherData[selectedCity] = weatherData; // 儲存資料
+                    allWeatherData[selectedCity] = weatherData; 
                     
                     initDistrictDropdowns(weatherData, districtSelect, savedDistrictIndex);
                     
-                    // 每次成功的縣市選擇都存起來
                     localStorage.setItem(`weather_${citySelectId}`, selectedCity);
                     
                     if (!isInitialLoad) updateComparison();
@@ -294,10 +298,9 @@
     function initDistrictDropdowns(weatherData, selectElement, savedDistrictIndex = -1) {
         selectElement.innerHTML = '';
         
-        let targetIndex = 0; // 預設選第一個
+        let targetIndex = 0; 
         
         weatherData.forEach((loc, index) => {
-            // 處理 LocationName/locationName 的差異
             const districtName = loc.LocationName || loc.locationName;
             
             const option = document.createElement('option');
@@ -306,23 +309,20 @@
             
             selectElement.appendChild(option);
             
-            // 如果有記憶的索引，且該索引在目前資料長度內，則設為目標索引
             if (index === savedDistrictIndex) {
                 targetIndex = savedDistrictIndex;
             }
         });
         
-        // 選取目標索引
         if(selectElement.options.length > 0) {
              selectElement.selectedIndex = targetIndex;
         }
     }
 
     // -------------------------------------------------------------
-    // 3. 比較功能 (新增記憶儲存)
+    // 3. 比較功能 (核心繪圖邏輯修正)
     // -------------------------------------------------------------
 
-    // 更新比較區塊
     function updateComparison() {
         const cityA = document.getElementById('cityA').value;
         const cityB = document.getElementById('cityB').value;
@@ -348,7 +348,7 @@
             return;
         }
 
-        // --- 儲存記憶狀態 ---
+        // 儲存記憶狀態
         localStorage.setItem('weather_districtA_idx', idxA);
         localStorage.setItem('weather_districtB_idx', idxB);
 
@@ -356,13 +356,12 @@
         container.appendChild(createWeatherCard(locA, cityA, 'scrollA'));
         container.appendChild(createWeatherCard(locB, cityB, 'scrollB'));
 
-        // 確保 DOM 元素已存在後再綁定捲動事件
+        // 同步捲動
         setTimeout(() => {
             const scrollA = document.getElementById('scrollA');
             const scrollB = document.getElementById('scrollB');
 
             if(scrollA && scrollB) {
-                // 同步捲動兩個表格
                 scrollA.onscroll = function() { scrollB.scrollLeft = scrollA.scrollLeft; };
                 scrollB.onscroll = function() { scrollA.scrollLeft = scrollB.scrollLeft; };
             }
@@ -371,7 +370,6 @@
 
     // 根據 Location 資料建立單一地區天氣卡片
     function createWeatherCard(locationData, cityName, scrollId) {
-        // 處理 LocationName 的大小寫問題
         const districtName = locationData.LocationName || locationData.locationName;
         
         const card = document.createElement('div');
@@ -386,7 +384,6 @@
         scrollWrapper.className = 'table-scroll-wrapper';
         scrollWrapper.id = scrollId;
 
-        // 處理 WeatherElement/weatherElement 的差異，並檢查是否存在
         const weatherElements = locationData.WeatherElement || locationData.weatherElement;
         
         if (!weatherElements || weatherElements.length === 0) {
@@ -394,9 +391,7 @@
              return card;
         }
 
-        // 將所有的 WeatherElement 轉換成以 ElementName 為 key 的 map 方便取用
         const elements = weatherElements.reduce((acc, curr) => {
-            // 關鍵修正：使用 PascalCase 存取 ElementName 和 Time
             acc[curr.ElementName] = curr.Time; 
             return acc;
         }, {});
@@ -464,7 +459,8 @@
         html += '<tr class="row-rh"><th class="sticky-col">濕度 (%)</th>';
         if (rhData) {
             rhData.forEach(tp => {
-                html += `<td>${tp.ElementValue[0].RelativeHumidity}%</td>`;
+                const rh = tp.ElementValue[0].RelativeHumidity || '?';
+                html += `<td>${rh}%</td>`;
             });
         } else {
             timePoints.forEach(() => { html += `<td>?</td>`; });
@@ -472,7 +468,7 @@
         html += '</tr>';
 
 
-        // 6. 降雨機率 (3小時降雨機率)
+        // 6. 降雨機率 (3小時降雨機率) <-- **修正處 1：加入顏色邏輯**
         const pop3Data = elements['3小時降雨機率'];
         html += '<tr class="row-pop"><th class="sticky-col">降雨機率</th>';
         
@@ -482,31 +478,55 @@
             
             timePoints.forEach((tp) => {
                 let val = '-';
+                let cellClass = ''; // 用於設定顏色 class
                 
                 if (popIndex < pop3Data.length) {
+                    const dataTime = new Date(tp.DataTime);
                     const startTime = new Date(pop3Data[popIndex].StartTime);
                     const endTime = new Date(pop3Data[popIndex].EndTime);
-                    const dataTime = new Date(tp.DataTime);
                     
                     if (dataTime >= startTime && dataTime < endTime) {
                         val = pop3Data[popIndex].ElementValue[0].ProbabilityOfPrecipitation;
+                        
+                        // --- 顏色判斷邏輯 ---
+                        const popValue = parseInt(val);
+                        if (popValue >= 50) {
+                            cellClass = 'pop-high'; // 紅色
+                        } else if (popValue >= 30 && popValue <= 40) {
+                            cellClass = 'pop-low'; // 藍色
+                        }
                     }
                     
                     if (popIndex + 1 < pop3Data.length) {
                         const nextStartTime = new Date(pop3Data[popIndex + 1].StartTime);
                         if (dataTime >= nextStartTime) {
                             popIndex++;
+                            // 重新檢查移動後的區間
                             const newStartTime = new Date(pop3Data[popIndex].StartTime);
                             const newEndTime = new Date(pop3Data[popIndex].EndTime);
                             if (dataTime >= newStartTime && dataTime < newEndTime) {
                                 val = pop3Data[popIndex].ElementValue[0].ProbabilityOfPrecipitation;
+                                
+                                // --- 顏色判斷邏輯 ---
+                                const popValue = parseInt(val);
+                                if (popValue >= 50) {
+                                    cellClass = 'pop-high'; // 紅色
+                                } else if (popValue >= 30 && popValue <= 40) {
+                                    cellClass = 'pop-low'; // 藍色
+                                } else {
+                                    cellClass = '';
+                                }
+                            } else {
+                                // 如果數據點正好在區間邊界外
+                                val = '-';
+                                cellClass = '';
                             }
                         }
                     }
                 }
                 
                 if (val !== '-') val += '%';
-                popHtml += `<td>${val}</td>`;
+                popHtml += `<td class="${cellClass}">${val}</td>`; // 將 class 加入 td 標籤
             });
             html += popHtml;
         } else {
@@ -514,12 +534,18 @@
         }
         html += '</tr>';
 
-        // 7. 天氣狀況 (天氣現象)
+        // 7. 天氣狀況 (天氣現象) 
         const wxData = elements['天氣現象'];
         html += '<tr class="row-wx"><th class="sticky-col">天氣</th>';
+        
         if (wxData) {
             wxData.forEach(tp => {
-                const wxText = tp.ElementValue[0].WeatherDescription; 
+                const description = tp.ElementValue && tp.ElementValue[0] ? 
+                                    tp.ElementValue[0].WeatherDescription : 
+                                    'N/A';
+                
+                const wxText = description && description.trim() !== '' ? description : '?'; 
+                
                 html += `<td title="${wxText}" style="font-size:12px;">${wxText}</td>`;
             });
         } else {
