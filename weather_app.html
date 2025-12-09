@@ -86,8 +86,8 @@
         }
         /* 天氣數據顏色 */
         .row-temp td { color: #d35400; font-weight: bold; }
-        .pop-low { color: #2980b9; font-weight: bold; } /* 30-40% 藍色 */
-        .pop-high { color: #c0392b; font-weight: bold; } /* 50%+ 紅色 */
+        .pop-low { color: #2980b9; font-weight: bold; } 
+        .pop-high { color: #c0392b; font-weight: bold; } 
         
         .footer-note { 
             margin-top: 20px; 
@@ -97,6 +97,26 @@
             line-height: 1.5;
         }
         
+        /* 新增 QPF 嵌入樣式 */
+        #qpf-container {
+            margin-top: 40px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        #qpf-container h3 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        #qpf-iframe {
+            width: 100%;
+            height: 800px; /* 設置一個足夠的高度來顯示整個頁面 */
+            border: none;
+        }
+
         @media (max-width: 900px) { 
             .comparison-container { grid-template-columns: 1fr; } 
             .controls { flex-direction: column; align-items: stretch; }
@@ -140,11 +160,16 @@
 
     <div id="comparisonArea" class="comparison-container">
         </div>
+    
+    <div id="qpf-container">
+        <h3>中央氣象署 - 定量降雨預報 (QPF)</h3>
+        <iframe id="qpf-iframe" src="https://www.cwa.gov.tw/V8/C/P/QPF.html" title="定量降雨預報"></iframe>
+    </div>
 
     <div class="footer-note">
         資料來源：中央氣象署 (API: F-D0047-xxx, 臺灣各縣市鄉鎮未來3天天氣預報)<br>
         製作者：Kusien<br>
-        版本：2.6
+        版本：2.7
     </div>
 
 <script>
@@ -195,12 +220,11 @@
         document.getElementById('cityA').value = savedCityA;
         document.getElementById('cityB').value = savedCityB;
         
-        // 載入地區資料 (使用異步處理確保兩邊都載入完成)
+        // 載入地區資料
         Promise.all([
             fetchDistricts('cityA', true, savedDistrictAIndex),
             fetchDistricts('cityB', true, savedDistrictBIndex)
         ]).then(() => {
-            // 兩邊地區資料都載入後，才執行第一次比較
             updateComparison();
         }).catch(error => {
             console.error("初始化載入失敗:", error);
@@ -320,7 +344,7 @@
     }
 
     // -------------------------------------------------------------
-    // 3. 比較功能 (核心繪圖邏輯修正)
+    // 3. 比較功能 
     // -------------------------------------------------------------
 
     function updateComparison() {
@@ -468,7 +492,7 @@
         html += '</tr>';
 
 
-        // 6. 降雨機率 (3小時降雨機率) <-- **修正處 1：加入顏色邏輯**
+        // 6. 降雨機率 (3小時降雨機率)
         const pop3Data = elements['3小時降雨機率'];
         html += '<tr class="row-pop"><th class="sticky-col">降雨機率</th>';
         
@@ -488,7 +512,6 @@
                     if (dataTime >= startTime && dataTime < endTime) {
                         val = pop3Data[popIndex].ElementValue[0].ProbabilityOfPrecipitation;
                         
-                        // --- 顏色判斷邏輯 ---
                         const popValue = parseInt(val);
                         if (popValue >= 50) {
                             cellClass = 'pop-high'; // 紅色
@@ -501,23 +524,20 @@
                         const nextStartTime = new Date(pop3Data[popIndex + 1].StartTime);
                         if (dataTime >= nextStartTime) {
                             popIndex++;
-                            // 重新檢查移動後的區間
                             const newStartTime = new Date(pop3Data[popIndex].StartTime);
                             const newEndTime = new Date(pop3Data[popIndex].EndTime);
                             if (dataTime >= newStartTime && dataTime < newEndTime) {
                                 val = pop3Data[popIndex].ElementValue[0].ProbabilityOfPrecipitation;
                                 
-                                // --- 顏色判斷邏輯 ---
                                 const popValue = parseInt(val);
                                 if (popValue >= 50) {
-                                    cellClass = 'pop-high'; // 紅色
+                                    cellClass = 'pop-high'; 
                                 } else if (popValue >= 30 && popValue <= 40) {
-                                    cellClass = 'pop-low'; // 藍色
+                                    cellClass = 'pop-low'; 
                                 } else {
                                     cellClass = '';
                                 }
                             } else {
-                                // 如果數據點正好在區間邊界外
                                 val = '-';
                                 cellClass = '';
                             }
@@ -526,7 +546,7 @@
                 }
                 
                 if (val !== '-') val += '%';
-                popHtml += `<td class="${cellClass}">${val}</td>`; // 將 class 加入 td 標籤
+                popHtml += `<td class="${cellClass}">${val}</td>`; 
             });
             html += popHtml;
         } else {
@@ -534,24 +554,22 @@
         }
         html += '</tr>';
 
-        // 7. 天氣狀況 (天氣現象) 
-        const wxData = elements['天氣現象'];
+        // 7. 天氣狀況 (天氣現象) - **此行已移除**
+        /* const wxData = elements['天氣現象'];
         html += '<tr class="row-wx"><th class="sticky-col">天氣</th>';
-        
         if (wxData) {
             wxData.forEach(tp => {
                 const description = tp.ElementValue && tp.ElementValue[0] ? 
                                     tp.ElementValue[0].WeatherDescription : 
                                     'N/A';
-                
                 const wxText = description && description.trim() !== '' ? description : '?'; 
-                
                 html += `<td title="${wxText}" style="font-size:12px;">${wxText}</td>`;
             });
         } else {
             timePoints.forEach(() => { html += `<td>?</td>`; });
         }
         html += '</tr>';
+        */
 
         html += '</table>';
         scrollWrapper.innerHTML = html;
