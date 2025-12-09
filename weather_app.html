@@ -197,7 +197,7 @@
     let weatherData = []; 
     let districts = [];
 
-    // 初始化：直接呼叫 CWA API (不使用代理服務，解決 CORS 500 錯誤)
+    // 初始化：直接呼叫 CWA API (不使用代理服務)
     window.onload = async function() {
         const loading = document.getElementById('loading');
         loading.style.display = 'block';
@@ -208,16 +208,27 @@
         try {
             const response = await fetch(apiUrl);
             
-            // 檢查 HTTP 狀態碼
             if (!response.ok) {
-                // 如果回傳 404/401/403 等錯誤，則拋出
                 throw new Error(`API response status: ${response.status}`);
             }
 
             const data = await response.json();
             
             if (data.success === "true") {
-                weatherData = data.records.locations[0].location;
+                // *** 修正資料解析路徑：嘗試直接讀取 location 陣列，以適應 F-D0047-073 結構 ***
+                if (data.records && data.records.location) {
+                    weatherData = data.records.location;
+                } else if (data.records && data.records.locations && data.records.locations[0] && data.records.locations[0].location) {
+                    // 保留舊的巢狀結構讀取方式，作為備用
+                    weatherData = data.records.locations[0].location;
+                } else {
+                    throw new Error("無法解析 API 資料結構 (records.location 不存在)");
+                }
+                
+                if (weatherData.length === 0) {
+                     throw new Error("API 回傳的 location 陣列為空。");
+                }
+                
                 initDropdowns();
                 selectDefault('小港區', '楠梓區');
                 updateComparison();
