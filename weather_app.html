@@ -190,30 +190,27 @@
     </div>
 
 <script>
+    // 確認 API Key 與最新的資料集 ID
     const API_KEY = 'CWA-E4AFF7A9-E0BD-4CB3-9447-963CE73C710C';
-    const KAOHSIUNG_ID = 'F-D0047-073'; // 高雄市鄉鎮未來1週天氣預報
+    const KAOHSIUNG_ID = 'F-D0047-073'; 
     
-    let weatherData = []; // 儲存所有區域的資料
+    let weatherData = []; 
     let districts = [];
 
-    // 替換後的初始化函式：使用 CORS 代理服務 (corsproxy.io) 繞過 CORS 限制
+    // 初始化：直接呼叫 CWA API (不使用代理服務，解決 CORS 500 錯誤)
     window.onload = async function() {
         const loading = document.getElementById('loading');
         loading.style.display = 'block';
 
-        // *** 新增代理網址 (Proxy URL) ***
-        const proxyUrl = 'https://corsproxy.io/?'; 
-        
-        // 將 CWA API 網址進行編碼
-        const targetUrl = encodeURIComponent(`https://opendata.cwa.gov.tw/api/v1/rest/datastore/${KAOHSIUNG_ID}?Authorization=${API_KEY}&format=JSON`);
+        // 直接構造 CWA API 網址
+        const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/${KAOHSIUNG_ID}?Authorization=${API_KEY}&format=JSON`;
 
         try {
-            // 使用代理網址進行 fetch 
-            const response = await fetch(proxyUrl + targetUrl);
+            const response = await fetch(apiUrl);
             
             // 檢查 HTTP 狀態碼
             if (!response.ok) {
-                // 如果代理服務返回非 200 狀態碼，拋出錯誤
+                // 如果回傳 404/401/403 等錯誤，則拋出
                 throw new Error(`API response status: ${response.status}`);
             }
 
@@ -222,7 +219,6 @@
             if (data.success === "true") {
                 weatherData = data.records.locations[0].location;
                 initDropdowns();
-                // 預設選擇小港和楠梓
                 selectDefault('小港區', '楠梓區');
                 updateComparison();
             } else {
@@ -230,8 +226,7 @@
             }
         } catch (error) {
             console.error("連線或解析錯誤:", error);
-            // 顯示更詳細的錯誤訊息給使用者
-            alert(`連線錯誤或 API 失敗，請檢查網路或授權碼：${error.message}`);
+            alert(`連線或 API 錯誤：${error.message}。請確認 CWA 授權碼是否有效，且網路連線正常。`);
         } finally {
             loading.style.display = 'none';
         }
@@ -257,7 +252,6 @@
         const selA = document.getElementById('districtA');
         const selB = document.getElementById('districtB');
         
-        // 簡單的文字比對來設定預設值
         for (let i=0; i<selA.options.length; i++) {
             if (selA.options[i].text === nameA) selA.selectedIndex = i;
         }
@@ -271,7 +265,7 @@
         const idxB = document.getElementById('districtB').value;
         
         const container = document.getElementById('comparisonArea');
-        container.innerHTML = ''; // 清空
+        container.innerHTML = ''; 
 
         if (weatherData.length === 0) return;
 
@@ -281,7 +275,6 @@
         container.appendChild(createWeatherCard(locA, 'scrollA'));
         container.appendChild(createWeatherCard(locB, 'scrollB'));
 
-        // 同步捲動邏輯
         const scrollA = document.getElementById('scrollA');
         const scrollB = document.getElementById('scrollB');
 
@@ -295,7 +288,6 @@
         }
     }
 
-    // 解析並建立單一地區的 HTML 結構
     function createWeatherCard(locationData, scrollId) {
         const card = document.createElement('div');
         card.className = 'district-card';
@@ -309,26 +301,24 @@
         scrollWrapper.className = 'table-scroll-wrapper';
         scrollWrapper.id = scrollId;
 
-        // 資料處理
         // T: 溫度, AT: 體感, RH: 濕度, PoP12h: 降雨機率(12h), Wx: 天氣現象
         const elements = locationData.weatherElement.reduce((acc, curr) => {
             acc[curr.elementName] = curr.time;
             return acc;
         }, {});
 
-        // 建立時間軸 (以溫度的時間點為基準)
         const timePoints = elements['T']; 
 
         let html = '<table>';
         
-        // 1. 日期列 (需要合併儲存格)
+        // 1. 日期列
         html += '<tr class="row-date"><th class="sticky-col">日期</th>';
         let currentDay = '';
         let spanCount = 0;
         let dayHeaders = [];
         
         timePoints.forEach((tp, index) => {
-            const dateStr = tp.startTime.substring(5, 10).replace('-', '/'); // "12/09"
+            const dateStr = tp.startTime.substring(5, 10).replace('-', '/'); 
             const dateObj = new Date(tp.startTime);
             const dayOfWeek = ["日", "一", "二", "三", "四", "五", "六"][dateObj.getDay()];
             const fullDate = `${dateStr} (${dayOfWeek})`;
@@ -342,7 +332,6 @@
             } else {
                 spanCount++;
             }
-            // 最後一個也要加入
             if (index === timePoints.length - 1) {
                  dayHeaders.push({text: currentDay, span: spanCount});
             }
@@ -356,7 +345,7 @@
         // 2. 時間列
         html += '<tr class="row-time"><th class="sticky-col">時間</th>';
         timePoints.forEach(tp => {
-            const timeStr = tp.startTime.substring(11, 16); // "09:00"
+            const timeStr = tp.startTime.substring(11, 16); 
             html += `<td>${timeStr}</td>`;
         });
         html += '</tr>';
@@ -368,28 +357,25 @@
         });
         html += '</tr>';
 
-        // 4. 體感溫度 (API: AT)
+        // 4. 體感溫度 (AT)
         html += '<tr class="row-app-temp"><th class="sticky-col">體感 (°C)</th>';
         elements['AT'].forEach(tp => {
             html += `<td>${tp.elementValue[0].value}</td>`;
         });
         html += '</tr>';
 
-        // 5. 相對濕度 (API: RH)
+        // 5. 相對濕度 (RH)
         html += '<tr class="row-rh"><th class="sticky-col">濕度 (%)</th>';
         elements['RH'].forEach(tp => {
             html += `<td>${tp.elementValue[0].value}%</td>`;
         });
         html += '</tr>';
 
-        // 6. 降雨機率 (API: PoP12h - 因為是長天期，通常是12h一筆，這裡需要特別處理對應)
-        // 注意：長天期預報 PoP12h 的時間區段較長，需要 mapping 到每 3 小時的格子
+        // 6. 降雨機率 (PoP12h)
         html += '<tr class="row-pop"><th class="sticky-col">降雨機率</th>';
         const popData = elements['PoP12h'];
         timePoints.forEach(tp => {
-            // 尋找涵蓋目前時間點的 PoP 資料
             const match = popData.find(p => {
-                // 簡單判斷：PoP startTime <= tp startTime < PoP endTime
                 return (p.startTime <= tp.startTime && tp.startTime < p.endTime);
             });
             let val = match ? match.elementValue[0].value : ' ';
@@ -398,10 +384,9 @@
         });
         html += '</tr>';
 
-        // 7. 天氣狀況 (API: Wx)
+        // 7. 天氣狀況 (Wx)
         html += '<tr class="row-wx"><th class="sticky-col">天氣</th>';
         elements['Wx'].forEach(tp => {
-            // 這裡只顯示文字，如果字太長可以用 title
             const wxText = tp.elementValue[0].value;
             html += `<td title="${wxText}" style="font-size:12px;">${wxText}</td>`;
         });
@@ -417,5 +402,3 @@
 
 </body>
 </html>
-
-
