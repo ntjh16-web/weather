@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>高雄市行政區天氣比較看板</title>
     <style>
+        /* ------------------------------------------------------------- */
+        /* 樣式表 (CSS) */
+        /* ------------------------------------------------------------- */
         :root {
             --primary-color: #2c3e50;
             --accent-color: #3498db;
@@ -189,24 +192,23 @@
     </div>
 
 <script>
-    // -------------------------------------------------------------------------
+    // -------------------------------------------------------------
     // 1. API 配置與變數初始化
-    // -------------------------------------------------------------------------
+    // -------------------------------------------------------------
     const API_KEY = 'CWA-E4AFF7A9-E0BD-4CB3-9447-963CE73C710C';
     // F-D0047-071: 鄉鎮未來 1 週逐 12 小時天氣預報
     const KAOHSIUNG_ID = 'F-D0047-071'; 
     
     let weatherData = []; 
-    // districts 變數在這個版本中不再使用，直接操作 weatherData
 
-    // -------------------------------------------------------------------------
-    // 2. 核心：資料取得與解析 (修正強化版)
-    // -------------------------------------------------------------------------
+    // -------------------------------------------------------------
+    // 2. 核心：資料取得與解析 (最終修正版)
+    // -------------------------------------------------------------
     window.onload = async function() {
         const loading = document.getElementById('loading');
         loading.style.display = 'block';
 
-        // *** 關鍵修正：在 URL 中明確指定 locationName=高雄市 ***
+        // *** 關鍵 URL：明確要求只回傳 '高雄市' 的資料 ***
         const apiUrl = `https://opendata.cwa.gov.tw/api/v1/rest/datastore/${KAOHSIUNG_ID}?Authorization=${API_KEY}&format=JSON&locationName=高雄市`;
 
         try {
@@ -219,60 +221,65 @@
             const data = await response.json();
             
             if (data.success === "true") {
+                
+                if (!data.records) {
+                    throw new Error("API 回傳的資料結構缺少 'records' 欄位。");
+                }
+
+                // 嘗試處理 locations 的大小寫
+                let locationsArray = data.records.locations || data.records.Locations; 
                 let kaohsiungData = null;
                 
-                // 檢查 records.locations 結構
-                if (data.records && data.records.locations && data.records.locations.length > 0) {
-                    
-                    // *** 強健修正：明確尋找 LocationsName 為 '高雄市' 的物件 ***
-                    kaohsiungData = data.records.locations.find(
-                        loc => loc.locationsName === '高雄市' || loc.LocationsName === '高雄市'
+                // 步驟 1: 嘗試從 locations 陣列中尋找 '高雄市'
+                if (locationsArray && locationsArray.length > 0) {
+                    // 嘗試處理 LocationsName 的大小寫
+                    kaohsiungData = locationsArray.find(
+                        loc => loc.LocationsName === '高雄市' || loc.locationsName === '高雄市'
                     );
                 }
                 
-                // 檢查 kaohsiungData 是否找到且包含鄉鎮資料 (location 陣列)
-                if (kaohsiungData && kaohsiungData.location) {
-                    weatherData = kaohsiungData.location; // 鄉鎮資料陣列
+                // 步驟 2: 確認是否找到高雄市資料，並從中取出鄉鎮資料 (location 陣列)
+                if (kaohsiungData && (kaohsiungData.location || kaohsiungData.Location)) {
+                    weatherData = kaohsiungData.location || kaohsiungData.Location; // 嘗試 location 大小寫
                     
-                } else if (data.records && data.records.location) {
-                    // 備用路徑 (適用於某些舊的資料集結構，如果 API 直接返回所有鄉鎮資料而沒有 Locations 層級)
-                    weatherData = data.records.location;
+                } else if (data.records.location || data.records.Location) {
+                    // 步驟 3: 備用路徑 - 如果 API 直接返回鄉鎮資料陣列在 records 層級
+                    weatherData = data.records.location || data.records.Location; 
                 } else {
-                    // 如果所有已知路徑都無法取得鄉鎮資料，則拋出錯誤
-                    throw new Error("無法從 API 取得高雄市鄉鎮地區資料。");
+                    // 如果所有路徑都失敗，則拋出詳細錯誤
+                    const missingKey = locationsArray ? "location" : "locations";
+                    throw new Error(`無法從 API 取得高雄市鄉鎮地區資料。JSON中缺少關鍵欄位：'${missingKey}' 或 'records.locations'。`);
                 }
                 
                 if (weatherData.length === 0) {
-                     throw new Error("API 回傳的高雄市鄉鎮地區陣列為空。請檢查 API Key 權限。");
+                     throw new Error("API 回傳的高雄市鄉鎮地區陣列為空 (0筆資料)。請檢查 CWA 授權碼的權限是否能存取 F-D0047-071。");
                 }
                 
                 // 資料成功取得後，初始化介面
                 initDropdowns();
-                selectDefault('左營區', '鳳山區'); // 預設選取
+                selectDefault('左營區', '鳳山區');
                 updateComparison();
                 
             } else {
-                // CWA 回傳 success: "false"
                 alert("API 請求失敗，CWA 回傳錯誤訊息。");
             }
         } catch (error) {
             console.error("連線或解析錯誤:", error);
-            alert(`連線或 API 錯誤：${error.message}。請確認 CWA 授權碼的有效性和權限。`);
+            alert(`連線或 API 錯誤：${error.message}`);
         } finally {
             loading.style.display = 'none';
         }
     };
 
-    // -------------------------------------------------------------------------
+    // -------------------------------------------------------------
     // 3. 介面操作函式
-    // -------------------------------------------------------------------------
+    // -------------------------------------------------------------
     
     // 初始化下拉選單
     function initDropdowns() {
         const selA = document.getElementById('districtA');
         const selB = document.getElementById('districtB');
         
-        // 清空現有選項
         selA.innerHTML = '';
         selB.innerHTML = '';
 
@@ -293,7 +300,6 @@
         const selA = document.getElementById('districtA');
         const selB = document.getElementById('districtB');
         
-        // 尋找對應名稱並設定 selectedIndex
         for (let i=0; i<selA.options.length; i++) {
             if (selA.options[i].text === nameA) selA.selectedIndex = i;
         }
@@ -384,7 +390,6 @@
             } else {
                 spanCount++;
             }
-            // 處理最後一個項目
             if (index === timePoints.length - 1) {
                  dayHeaders.push({text: currentDay, span: spanCount});
             }
@@ -452,7 +457,6 @@
         html += '<tr class="row-wx"><th class="sticky-col">天氣</th>';
         wxData.forEach(tp => {
             const wxText = tp.ElementValue[0].Weather;
-            // 由於格子較小，天氣現象字串可能很長，使用 title 提示
             html += `<td title="${wxText}" style="font-size:12px;">${wxText}</td>`;
         });
         html += '</tr>';
