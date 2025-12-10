@@ -104,7 +104,6 @@
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow: hidden; /* 防止父容器出現捲軸 */
         }
         #qpf-container h3 {
             color: var(--primary-color);
@@ -113,10 +112,17 @@
             margin-top: 0;
         }
         
+        /* QPF 容器 (Wrapper) - 提供橫向捲動 */
+        #qpf-iframe-wrapper {
+            overflow-x: auto; /* 允許橫向捲動 */
+            overflow-y: hidden; /* 隱藏這個外層容器的垂直捲動 */
+        }
+
         #qpf-iframe {
-            width: 100%;
-            height: 1500px; 
+            width: 1000px; /* 設一個足夠寬的固定值給 iframe，讓內容不會被手機螢幕切掉 */
+            height: 1500px; /* 確保縱向內容可以顯示完整 */
             border: none;
+            display: block;
         }
 
         @media (max-width: 900px) { 
@@ -126,23 +132,11 @@
             .select-pair { padding: 5px; }
             button { align-self: center; }
             
-            /* 針對小螢幕，調整 QPF iframe 顯示 */
+            /* 在小螢幕上，QPF 容器將提供橫向捲動條 */
+            /* 移除複雜的縮放樣式 */
             #qpf-iframe {
-                /* 讓 iframe 內容縮放以適應手機寬度 */
-                width: 150%; /* 假設 CWA 網頁的標準寬度約為 1200px (手機寬度約 400px，所以 1200/400 = 3倍，但這裡先使用 150% 配合 transform 試試看) */
-                transform: scale(0.66); /* 縮小到約 2/3 寬度 */
-                transform-origin: 0 0; /* 從左上角開始縮放 */
-                height: 2200px; /* 縮小後內容會變長，需要更大的高度 */
-            }
-        }
-
-        /* 再次嘗試 Media Query 優化 */
-        @media (max-width: 600px) {
-            #qpf-iframe {
-                width: 200%; /* 假設 CWA 網頁寬度約 800px (手機寬度約 400px) */
-                transform: scale(0.5); /* 縮小到 1/2 寬度 */
-                transform-origin: 0 0;
-                height: 2500px; /* 確保內容不會被切掉 */
+                width: 1200px; /* 再次擴大，確保 CWA 網頁的寬內容可以被完整包含 */
+                height: 1800px; /* 增加高度，避免縱向內容被裁切 */
             }
         }
     </style>
@@ -184,7 +178,9 @@
     
     <div id="qpf-container">
         <h3>中央氣象署 - 定量降雨預報 (QPF)</h3>
-        <iframe id="qpf-iframe" src="https://www.cwa.gov.tw/V8/C/P/QPF.html" title="定量降雨預報" scrolling="no"></iframe>
+        <div id="qpf-iframe-wrapper">
+            <iframe id="qpf-iframe" src="https://www.cwa.gov.tw/V8/C/P/QPF.html" title="定量降雨預報"></iframe>
+        </div>
     </div>
 
     <div class="footer-note">
