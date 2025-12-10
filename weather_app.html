@@ -103,7 +103,7 @@
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow: hidden; /* 防止溢出 */
+            overflow: hidden; 
         }
         #qpf-container h3 {
             color: var(--primary-color);
@@ -114,8 +114,8 @@
         }
         
         #qpf-iframe {
-            width: 100%; /* 原始比例顯示，填滿寬度 */
-            height: 2500px; /* 給予極大的高度，讓內容完整垂直展開 */
+            width: 100%; 
+            height: 2500px; /* 大幅增加高度 */
             border: none;
             display: block;
         }
@@ -176,10 +176,13 @@
     <div class="footer-note">
         資料來源：中央氣象署 (API: F-D0047-xxx, 臺灣各縣市鄉鎮未來3天天氣預報)<br>
         製作者：Kusien<br>
-        版本：2.92
+        版本：2.9.2
     </div>
 
 <script>
+    // -------------------------------------------------------------
+    // 1. API 配置與變數初始化
+    // -------------------------------------------------------------
     const API_KEY = 'CWA-E4AFF7A9-E0BD-4CB3-9447-963CE73C710C'; 
     let allWeatherData = {}; 
     const CITY_DATA_MAP = {
@@ -191,6 +194,9 @@
         '連江縣': 'F-D0047-081', '金門縣': 'F-D0047-085',
     };
 
+    // -------------------------------------------------------------
+    // 2. 核心：資料取得與解析 (保留記憶功能)
+    // -------------------------------------------------------------
     window.onload = function() {
         initCityDropdowns();
         const savedCityA = localStorage.getItem('weather_cityA') || '高雄市';
@@ -256,6 +262,10 @@
         selectElement.selectedIndex = savedDistrictIndex >= 0 ? savedDistrictIndex : 0;
     }
 
+    // -------------------------------------------------------------
+    // 3. 比較功能 
+    // -------------------------------------------------------------
+
     function updateComparison() {
         const cityA = document.getElementById('cityA').value;
         const cityB = document.getElementById('cityB').value;
@@ -265,8 +275,19 @@
         container.innerHTML = ''; 
         localStorage.setItem('weather_districtA_idx', idxA);
         localStorage.setItem('weather_districtB_idx', idxB);
-        container.appendChild(createWeatherCard(allWeatherData[cityA][idxA], cityA, 'scrollA'));
-        container.appendChild(createWeatherCard(allWeatherData[cityB][idxB], cityB, 'scrollB'));
+        
+        // 確保資料存在
+        const locA = allWeatherData[cityA]?.[idxA];
+        const locB = allWeatherData[cityB]?.[idxB];
+
+        if (locA && locB) {
+            container.appendChild(createWeatherCard(locA, cityA, 'scrollA'));
+            container.appendChild(createWeatherCard(locB, cityB, 'scrollB'));
+        } else {
+             container.innerHTML = '<p style="text-align:center; color: red;">**錯誤：** 選擇的地區資料載入不完整，請檢查。</p>';
+             return;
+        }
+
         setTimeout(() => {
             const scrollA = document.getElementById('scrollA'), scrollB = document.getElementById('scrollB');
             if(scrollA && scrollB) {
@@ -284,11 +305,41 @@
         const scrollWrapper = document.createElement('div');
         scrollWrapper.className = 'table-scroll-wrapper';
         scrollWrapper.id = scrollId;
-        const elements = (locationData.WeatherElement || locationData.weatherElement).reduce((acc, curr) => {
+
+        const weatherElements = locationData.WeatherElement || locationData.weatherElement;
+        const elements = weatherElements.reduce((acc, curr) => {
             acc[curr.ElementName] = curr.Time; return acc;
         }, {});
+        
         const timePoints = elements['溫度'];
         if (!timePoints) { return card; }
+
+        // --- 降雨機率預處理 (PoP3h) ---
+        // 建立一個時間到降雨機率的 Map，以便準確對應每小時資料
+        const pop3Data = elements['3小時降雨機率'];
+        const timeToPopMap = new Map();
+
+        if (pop3Data) {
+            pop3Data.forEach(popEntry => {
+                const popValue = popEntry.ElementValue[0].ProbabilityOfPrecipitation;
+                // 找到開始和結束時間點
+                let startTime = new Date(popEntry.StartTime);
+                let endTime = new Date(popEntry.EndTime);
+
+                // 從開始時間，每隔一小時將 PoP 值放入 Map，直到結束時間前一小時
+                let currentHour = new Date(startTime);
+                while (currentHour < endTime) {
+                    // 使用 YYYY-MM-DDTHH 格式作為 key
+                    const key = currentHour.toISOString().substring(0, 13); 
+                    timeToPopMap.set(key, popValue);
+
+                    // 增加一小時
+                    currentHour.setHours(currentHour.getHours() + 1);
+                }
+            });
+        }
+        
+        // --- 繪製表格 ---
         let html = '<table><tr class="row-date"><th class="sticky-col">日期</th>';
         let dateMap = new Map(); 
         timePoints.forEach(tp => {
@@ -296,30 +347,47 @@
             dateMap.set(dateStr, (dateMap.get(dateStr) || 0) + 1);
         });
         dateMap.forEach((span, dateStr) => { html += `<th colspan="${span}">${dateStr}</th>`; });
+        
+        // 2. 時間列
         html += '</tr><tr class="row-time"><th class="sticky-col">時段</th>';
         timePoints.forEach(tp => html += `<td>${tp.DataTime.substring(11, 16).replace(':00', '')}</td>`);
-        html += '</tr><tr class="row-temp"><th class="sticky-col">溫度</th>';
+        
+        // 3. 溫度
+        html += '</tr><tr class="row-temp"><th class="sticky-col">溫度 (°C)</th>';
         timePoints.forEach(tp => html += `<td>${tp.ElementValue[0].Temperature}</td>`);
-        html += '</tr><tr class="row-app-temp"><th class="sticky-col">體感</th>';
+        
+        // 4. 體感溫度
+        html += '</tr><tr class="row-app-temp"><th class="sticky-col">體感 (°C)</th>';
         elements['體感溫度'].forEach(tp => html += `<td>${tp.ElementValue[0].ApparentTemperature}</td>`);
-        html += '</tr><tr class="row-rh"><th class="sticky-col">濕度</th>';
+        
+        // 5. 濕度
+        html += '</tr><tr class="row-rh"><th class="sticky-col">濕度 (%)</th>';
         elements['相對濕度'].forEach(tp => html += `<td>${tp.ElementValue[0].RelativeHumidity}%</td>`);
-        html += '</tr><tr class="row-pop"><th class="sticky-col">降雨</th>';
-        let popIndex = 0, pop3Data = elements['3小時降雨機率'];
+        
+        // 6. 降雨機率 (使用預處理的 Map)
+        html += '</tr><tr class="row-pop"><th class="sticky-col">降雨機率</th>';
+
         timePoints.forEach(tp => {
-            let val = '-', cellClass = '', dataTime = new Date(tp.DataTime);
-            if (popIndex < pop3Data.length) {
-                const start = new Date(pop3Data[popIndex].StartTime), end = new Date(pop3Data[popIndex].EndTime);
-                if (dataTime >= start && dataTime < end) val = pop3Data[popIndex].ElementValue[0].ProbabilityOfPrecipitation;
-                if (popIndex + 1 < pop3Data.length && dataTime >= new Date(pop3Data[popIndex + 1].StartTime)) popIndex++;
+            // 找出對應的 Key (YYYY-MM-DDTHH)
+            const key = tp.DataTime.substring(0, 13);
+            const val = timeToPopMap.get(key);
+            
+            let displayVal = '-';
+            let cellClass = '';
+
+            if (val !== undefined) {
+                const popValue = parseInt(val);
+                displayVal = `${popValue}%`;
+                if (popValue >= 50) {
+                    cellClass = 'pop-high'; 
+                } else if (popValue >= 30) {
+                    cellClass = 'pop-low'; 
+                }
             }
-            if (val !== '-') {
-                const v = parseInt(val);
-                if (v >= 50) cellClass = 'pop-high'; else if (v >= 30) cellClass = 'pop-low';
-                val += '%';
-            }
-            html += `<td class="${cellClass}">${val}</td>`;
+
+            html += `<td class="${cellClass}">${displayVal}</td>`;
         });
+
         html += '</tr></table>';
         scrollWrapper.innerHTML = html;
         card.appendChild(scrollWrapper);
