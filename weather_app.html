@@ -97,7 +97,7 @@
             line-height: 1.5;
         }
         
-        /* 新增 QPF 嵌入樣式 */
+        /* QPF 嵌入樣式 */
         #qpf-container {
             margin-top: 40px;
             padding: 20px;
@@ -111,18 +111,43 @@
             padding-bottom: 10px;
             margin-top: 0;
         }
+        
+        /* 桌面版 iframe 基礎設定 */
         #qpf-iframe {
             width: 100%;
-            height: 800px; /* 設置一個足夠的高度來顯示整個頁面 */
+            height: 1500px; 
             border: none;
+            display: block;
         }
-
+        
+        /* ------------------------------------------------------------- */
+        /* 手機版適配 (關鍵修改) */
+        /* ------------------------------------------------------------- */
         @media (max-width: 900px) { 
             .comparison-container { grid-template-columns: 1fr; } 
             .controls { flex-direction: column; align-items: stretch; }
             .control-group { flex-direction: row; justify-content: space-between; align-items: center; }
             .select-pair { padding: 5px; }
             button { align-self: center; }
+            
+            /* 強制 iframe 縮放以適應手機寬度，同時給予足夠的縱向長度 */
+            #qpf-iframe {
+                /* CWA 網頁設計寬度約 1200px 左右，若手機寬度約 400px，縮放比例約 0.33 */
+                width: 1200px; /* 設一個比手機寬很多的寬度，容納原始 CWA 內容 */
+                height: 3000px; /* 大幅增加高度，確保所有縱向內容都能顯示 */
+                
+                /* 使用 CSS 縮放：這是解決橫向溢出、同時保持垂直捲動的關鍵 */
+                transform: scale(0.33); 
+                transform-origin: 0 0; /* 從左上角開始縮放 */
+            }
+            
+            /* 讓父容器 (qpf-container) 剛好包住縮小後的 iframe */
+            #qpf-container {
+                /* 讓父容器的寬度設為縮小後的寬度，並隱藏超出的部分 */
+                width: 100%; 
+                /* 確保縮小後的內容不會在頁面中佔用原始高度，而是佔用縮小後的高度 */
+                overflow: hidden; 
+            }
         }
     </style>
 </head>
@@ -163,13 +188,13 @@
     
     <div id="qpf-container">
         <h3>中央氣象署 - 定量降雨預報 (QPF)</h3>
-        <iframe id="qpf-iframe" src="https://www.cwa.gov.tw/V8/C/P/QPF.html" title="定量降雨預報"></iframe>
+        <iframe id="qpf-iframe" src="https://www.cwa.gov.tw/V8/C/P/QPF.html" title="定量降雨預報" scrolling="no"></iframe>
     </div>
 
     <div class="footer-note">
         資料來源：中央氣象署 (API: F-D0047-xxx, 臺灣各縣市鄉鎮未來3天天氣預報)<br>
         製作者：Kusien<br>
-        版本：2.7
+        版本：2.9
     </div>
 
 <script>
@@ -502,7 +527,7 @@
             
             timePoints.forEach((tp) => {
                 let val = '-';
-                let cellClass = ''; // 用於設定顏色 class
+                let cellClass = ''; 
                 
                 if (popIndex < pop3Data.length) {
                     const dataTime = new Date(tp.DataTime);
@@ -514,9 +539,9 @@
                         
                         const popValue = parseInt(val);
                         if (popValue >= 50) {
-                            cellClass = 'pop-high'; // 紅色
+                            cellClass = 'pop-high'; 
                         } else if (popValue >= 30 && popValue <= 40) {
-                            cellClass = 'pop-low'; // 藍色
+                            cellClass = 'pop-low'; 
                         }
                     }
                     
@@ -554,22 +579,7 @@
         }
         html += '</tr>';
 
-        // 7. 天氣狀況 (天氣現象) - **此行已移除**
-        /* const wxData = elements['天氣現象'];
-        html += '<tr class="row-wx"><th class="sticky-col">天氣</th>';
-        if (wxData) {
-            wxData.forEach(tp => {
-                const description = tp.ElementValue && tp.ElementValue[0] ? 
-                                    tp.ElementValue[0].WeatherDescription : 
-                                    'N/A';
-                const wxText = description && description.trim() !== '' ? description : '?'; 
-                html += `<td title="${wxText}" style="font-size:12px;">${wxText}</td>`;
-            });
-        } else {
-            timePoints.forEach(() => { html += `<td>?</td>`; });
-        }
-        html += '</tr>';
-        */
+        // **天氣現象行已移除**
 
         html += '</table>';
         scrollWrapper.innerHTML = html;
