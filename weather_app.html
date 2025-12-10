@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>臺灣各縣市行政區天氣比較看板 (3 天預報)</title>
+    <title>臺灣各縣市行政區天氣比較 (3 天預報)</title>
     <style>
         /* ------------------------------------------------------------- */
         /* 樣式表 (CSS) */
@@ -79,7 +79,7 @@
         }
         table { border-collapse: collapse; width: max-content; }
         th, td { 
-            padding: 8px 10px; text-align: center; border: 1px solid var(--border-color); font-size: 16px; white-space: nowrap; 
+            padding: 8px 8px; text-align: center; border: 1px solid var(--border-color); font-size: 16px; white-space: nowrap; /* 放大字體 */
         }
         .sticky-col { 
             position: sticky; left: 0; background-color: var(--header-bg); z-index: 2; font-weight: bold; border-right: 2px solid #ccc; min-width: 80px; 
@@ -135,7 +135,7 @@
 </head>
 <body>
 
-    <h2>臺灣各縣市行政區天氣比較看板 (3 天預報)</h2>
+    <h2>臺灣各縣市行政區天氣比較 (3 天預報)</h2>
 
     <div class="controls">
         <div class="select-pair">
@@ -174,7 +174,7 @@
     </div>
 
     <div class="footer-note">
-        資料來源：中央氣象署 (API: F-D0047-xxx, 臺灣各縣市鄉鎮未來3天天氣預報)<br>
+        資料來源：中央氣象署 <br>
         製作者：Kusien<br>
         版本：2.9.2
     </div>
@@ -396,4 +396,5 @@
 </script>
 </body>
 </html>
+
 
