@@ -97,7 +97,7 @@
             line-height: 1.5;
         }
         
-        /* 新增 QPF 嵌入樣式 */
+        /* QPF 嵌入樣式 */
         #qpf-container {
             margin-top: 40px;
             padding: 20px;
@@ -113,7 +113,7 @@
         }
         #qpf-iframe {
             width: 100%;
-            height: 800px; /* 設置一個足夠的高度來顯示整個頁面 */
+            height: 1500px; /* 增加高度，嘗試容納整個頁面內容 */
             border: none;
         }
 
@@ -163,13 +163,13 @@
     
     <div id="qpf-container">
         <h3>中央氣象署 - 定量降雨預報 (QPF)</h3>
-        <iframe id="qpf-iframe" src="https://www.cwa.gov.tw/V8/C/P/QPF.html" title="定量降雨預報"></iframe>
+        <iframe id="qpf-iframe" src="https://www.cwa.gov.tw/V8/C/P/QPF.html" title="定量降雨預報" scrolling="no"></iframe>
     </div>
 
     <div class="footer-note">
         資料來源：中央氣象署 (API: F-D0047-xxx, 臺灣各縣市鄉鎮未來3天天氣預報)<br>
         製作者：Kusien<br>
-        版本：2.7
+        版本：2.8
     </div>
 
 <script>
@@ -502,7 +502,7 @@
             
             timePoints.forEach((tp) => {
                 let val = '-';
-                let cellClass = ''; // 用於設定顏色 class
+                let cellClass = ''; 
                 
                 if (popIndex < pop3Data.length) {
                     const dataTime = new Date(tp.DataTime);
@@ -514,9 +514,9 @@
                         
                         const popValue = parseInt(val);
                         if (popValue >= 50) {
-                            cellClass = 'pop-high'; // 紅色
+                            cellClass = 'pop-high'; 
                         } else if (popValue >= 30 && popValue <= 40) {
-                            cellClass = 'pop-low'; // 藍色
+                            cellClass = 'pop-low'; 
                         }
                     }
                     
@@ -554,22 +554,7 @@
         }
         html += '</tr>';
 
-        // 7. 天氣狀況 (天氣現象) - **此行已移除**
-        /* const wxData = elements['天氣現象'];
-        html += '<tr class="row-wx"><th class="sticky-col">天氣</th>';
-        if (wxData) {
-            wxData.forEach(tp => {
-                const description = tp.ElementValue && tp.ElementValue[0] ? 
-                                    tp.ElementValue[0].WeatherDescription : 
-                                    'N/A';
-                const wxText = description && description.trim() !== '' ? description : '?'; 
-                html += `<td title="${wxText}" style="font-size:12px;">${wxText}</td>`;
-            });
-        } else {
-            timePoints.forEach(() => { html += `<td>?</td>`; });
-        }
-        html += '</tr>';
-        */
+        // **天氣現象行已移除**
 
         html += '</table>';
         scrollWrapper.innerHTML = html;
