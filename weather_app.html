@@ -97,7 +97,7 @@
             line-height: 1.5;
         }
         
-        /* QPF 嵌入樣式 */
+        /* 新增 QPF 嵌入樣式 */
         #qpf-container {
             margin-top: 40px;
             padding: 20px;
@@ -111,18 +111,10 @@
             padding-bottom: 10px;
             margin-top: 0;
         }
-        
-        /* QPF 容器 (Wrapper) - 提供橫向捲動 */
-        #qpf-iframe-wrapper {
-            overflow-x: auto; /* 允許橫向捲動 */
-            overflow-y: hidden; /* 隱藏這個外層容器的垂直捲動 */
-        }
-
         #qpf-iframe {
-            width: 1000px; /* 設一個足夠寬的固定值給 iframe，讓內容不會被手機螢幕切掉 */
-            height: 1500px; /* 確保縱向內容可以顯示完整 */
+            width: 100%;
+            height: 800px; /* 設置一個足夠的高度來顯示整個頁面 */
             border: none;
-            display: block;
         }
 
         @media (max-width: 900px) { 
@@ -131,13 +123,6 @@
             .control-group { flex-direction: row; justify-content: space-between; align-items: center; }
             .select-pair { padding: 5px; }
             button { align-self: center; }
-            
-            /* 在小螢幕上，QPF 容器將提供橫向捲動條 */
-            /* 移除複雜的縮放樣式 */
-            #qpf-iframe {
-                width: 1200px; /* 再次擴大，確保 CWA 網頁的寬內容可以被完整包含 */
-                height: 1800px; /* 增加高度，避免縱向內容被裁切 */
-            }
         }
     </style>
 </head>
@@ -178,15 +163,13 @@
     
     <div id="qpf-container">
         <h3>中央氣象署 - 定量降雨預報 (QPF)</h3>
-        <div id="qpf-iframe-wrapper">
-            <iframe id="qpf-iframe" src="https://www.cwa.gov.tw/V8/C/P/QPF.html" title="定量降雨預報"></iframe>
-        </div>
+        <iframe id="qpf-iframe" src="https://www.cwa.gov.tw/V8/C/P/QPF.html" title="定量降雨預報"></iframe>
     </div>
 
     <div class="footer-note">
         資料來源：中央氣象署 (API: F-D0047-xxx, 臺灣各縣市鄉鎮未來3天天氣預報)<br>
         製作者：Kusien<br>
-        版本：2.9
+        版本：2.7
     </div>
 
 <script>
@@ -519,7 +502,7 @@
             
             timePoints.forEach((tp) => {
                 let val = '-';
-                let cellClass = ''; 
+                let cellClass = ''; // 用於設定顏色 class
                 
                 if (popIndex < pop3Data.length) {
                     const dataTime = new Date(tp.DataTime);
@@ -531,9 +514,9 @@
                         
                         const popValue = parseInt(val);
                         if (popValue >= 50) {
-                            cellClass = 'pop-high'; 
+                            cellClass = 'pop-high'; // 紅色
                         } else if (popValue >= 30 && popValue <= 40) {
-                            cellClass = 'pop-low'; 
+                            cellClass = 'pop-low'; // 藍色
                         }
                     }
                     
@@ -571,7 +554,22 @@
         }
         html += '</tr>';
 
-        // **天氣現象行已移除**
+        // 7. 天氣狀況 (天氣現象) - **此行已移除**
+        /* const wxData = elements['天氣現象'];
+        html += '<tr class="row-wx"><th class="sticky-col">天氣</th>';
+        if (wxData) {
+            wxData.forEach(tp => {
+                const description = tp.ElementValue && tp.ElementValue[0] ? 
+                                    tp.ElementValue[0].WeatherDescription : 
+                                    'N/A';
+                const wxText = description && description.trim() !== '' ? description : '?'; 
+                html += `<td title="${wxText}" style="font-size:12px;">${wxText}</td>`;
+            });
+        } else {
+            timePoints.forEach(() => { html += `<td>?</td>`; });
+        }
+        html += '</tr>';
+        */
 
         html += '</table>';
         scrollWrapper.innerHTML = html;
